@@ -894,7 +894,7 @@ describe('treasury', function () {
     describe('Game Theory Changes: Theoretics', () => {
         it("setFeeStages SUCCESS", async () => {
             const feeStageTime = [zero, hours, days, days.mul(3), days.mul(4), days.mul(5), days.mul(6)];
-            const feeStagePercentage = [BigNumber.from(800), BigNumber.from(300), BigNumber.from(200), BigNumber.from(100), BigNumber.from(50), BigNumber.from(25), BigNumber.from(1)];
+            const feeStagePercentage = [BigNumber.from(800), BigNumber.from(799), BigNumber.from(300), BigNumber.from(100), BigNumber.from(50), BigNumber.from(25), BigNumber.from(1)];
             await theoretics.setFeeStages(feeStageTime, feeStagePercentage);
             expect(await theoretics.feeStageTime(6)).to.equal(feeStageTime[6]);
             expect(await theoretics.feeStagePercentage(1)).to.equal(feeStagePercentage[1]);
@@ -926,6 +926,8 @@ describe('treasury', function () {
         it("setSameBlockFee SUCCESS", async () => {
             await theoretics.setSameBlockFee(2499);
             expect(await theoretics.sameBlockFee()).to.equal(2499);
+            await theoretics.setSameBlockFee(2500);
+            expect(await theoretics.sameBlockFee()).to.equal(2500);
         });
         it("setSameBlockFee FAILURE", async () => {
             expect(theoretics.setSameBlockFee(2501)).to.be.revertedWith(
@@ -1040,6 +1042,8 @@ describe('treasury', function () {
         it('setDepositFee SUCCESS', async function () {
             await genesisPool.setDepositFee(99);
             expect(await genesisPool.depositFee()).to.equal(99);
+            await genesisPool.setDepositFee(100);
+            expect(await genesisPool.depositFee()).to.equal(100);
         })
         it('setDepositFee FAILURE', async function () {
             await expect(genesisPool.setDepositFee(101)).to.be.revertedWith('Deposit fee must be less than 1%');
@@ -1049,7 +1053,7 @@ describe('treasury', function () {
     describe('Game Theory Changes: TheoryRewardPool', () => {
         it("setFeeStages SUCCESS", async () => {
             const feeStageTime = [zero, hours, days, days.mul(3), days.mul(4), days.mul(5), days.mul(6)];
-            const feeStagePercentage = [BigNumber.from(800), BigNumber.from(300), BigNumber.from(200), BigNumber.from(100), BigNumber.from(50), BigNumber.from(25), BigNumber.from(1)];
+            const feeStagePercentage = [BigNumber.from(800), BigNumber.from(799), BigNumber.from(300), BigNumber.from(100), BigNumber.from(50), BigNumber.from(25), BigNumber.from(1)];
             await theoryRewardPool.setFeeStages(feeStageTime, feeStagePercentage);
             expect(await theoryRewardPool.feeStageTime(6)).to.equal(feeStageTime[6]);
             expect(await theoryRewardPool.feeStagePercentage(1)).to.equal(feeStagePercentage[1]);
@@ -1074,13 +1078,15 @@ describe('treasury', function () {
         });
         it("setFeeStages fee FAILURE", async () => {
             const feeStageTime = [zero, hours, days, days.mul(3), days.mul(4), days.mul(5), days.mul(6)];
-            const feeStagePercentage = [BigNumber.from(800), BigNumber.from(900), BigNumber.from(200), BigNumber.from(100), BigNumber.from(50), BigNumber.from(25), BigNumber.from(1)];
+            const feeStagePercentage = [BigNumber.from(800), BigNumber.from(801), BigNumber.from(200), BigNumber.from(100), BigNumber.from(50), BigNumber.from(25), BigNumber.from(1)];
             expect(theoryRewardPool.setFeeStages(feeStageTime, feeStagePercentage)).to.be.revertedWith(
                 "Fee can't be higher than 8%.");
         });
         it("setSameBlockFee SUCCESS", async () => {
             await theoryRewardPool.setSameBlockFee(2499);
             expect(await theoryRewardPool.sameBlockFee()).to.equal(2499);
+            await theoryRewardPool.setSameBlockFee(2500);
+            expect(await theoryRewardPool.sameBlockFee()).to.equal(2500);
         });
         it("setSameBlockFee FAILURE", async () => {
             expect(theoryRewardPool.setSameBlockFee(2501)).to.be.revertedWith(
