@@ -103,7 +103,7 @@ async function main() {
 
     //await spookSwapFactory.createPair(sToken.address, iToken.address);
     await sToken.approve(spookSwapRouter.address, BigNumber.from("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"));
-    await spookSwapRouter.addLiquidity(sToken.address, iToken.address, BigNumber.from(10).pow(18), BigNumber.from(10).pow(18).mul(400), BigNumber.from(10).pow(18), BigNumber.from(10).pow(18).mul(71).add(BigNumber.from(10).pow(16).mul(54)), deployer.address, startTime.add(60 * 10));
+    await spookSwapRouter.addLiquidity(sToken.address, iToken.address, BigNumber.from(10).pow(18), BigNumber.from(10).pow(18).mul(71).add(BigNumber.from(10).pow(16).mul(54)), BigNumber.from(10).pow(18), BigNumber.from(10).pow(18).mul(71).add(BigNumber.from(10).pow(16).mul(54)), deployer.address, startTime.add(60 * 10));
 
     let pTokenPairAddress = await spookSwapFactory.getPair(pToken.address, iToken.address);
     console.log("-- GAME-DAI LP deployed to:", pTokenPairAddress);
