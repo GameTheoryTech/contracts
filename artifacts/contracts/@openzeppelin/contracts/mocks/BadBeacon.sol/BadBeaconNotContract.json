@@ -1,0 +1,24 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "BadBeaconNotContract",
+  "sourceName": "contracts/@openzeppelin/contracts/mocks/BadBeacon.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "implementation",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600f57600080fd5b50608a8061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c80635c60da1b14602d575b600080fd5b6033604f565b604080516001600160a01b039092168252519081900360200190f35b60019056fea264697066735822122063a95a939226d926a7eb764d0d2e54e51e97c6a219baf81b0ee8c97dde32481164736f6c634300060c0033",
+  "deployedBytecode": "0x6080604052348015600f57600080fd5b506004361060285760003560e01c80635c60da1b14602d575b600080fd5b6033604f565b604080516001600160a01b039092168252519081900360200190f35b60019056fea264697066735822122063a95a939226d926a7eb764d0d2e54e51e97c6a219baf81b0ee8c97dde32481164736f6c634300060c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
