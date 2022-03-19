@@ -196,7 +196,7 @@ contract Theoretics is ShareWrapper, Authorizable, ContractGuard {
     }
 
     function setLockUp(uint256 _withdrawLockupEpochs, uint256 _rewardLockupEpochs, uint256 _pegMaxUnlock) external onlyAuthorized onlyOneBlock { // Switched to onlyAuthorized just in case we vote on a new lock up period later. The max is now the default, so this can only help users.
-        require(_withdrawLockupEpochs >= _rewardLockupEpochs && _withdrawLockupEpochs <= 6 && _rewardLockupEpochs <= 3, "out of range"); // <= 6 epochs (36 hours)
+        require(_withdrawLockupEpochs >= _rewardLockupEpochs && _withdrawLockupEpochs <= 6 && _rewardLockupEpochs <= 3, "lockup epochs out of range"); // <= 6 epochs (36 hours)
         require(_pegMaxUnlock > treasury.gamePriceCeiling()
             && _pegMaxUnlock <= treasury.gamePriceOne().mul(4),
             "Max peg unlock must be greater than the GAME ceiling and lower than the price of one GAME times 4.");

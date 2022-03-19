@@ -949,6 +949,54 @@ describe('tests', function () {
             await ethers.provider.send('evm_mine',[]);
             expect(await theoretics.getWithdrawFeeOf(deployer.address)).to.equal(1);
         });
+        it("setLockUp changed value SUCCESS", async () => {
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(6);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(3);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(4));
+            await theoretics.setLockUp(4, 1, one.mul(2))
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(4);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(1);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(2));
+        });
+        it("setLockUp initial value SUCCESS", async () => {
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(6);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(3);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(4));
+            await theoretics.setLockUp(6, 3, one.mul(4))
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(6);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(3);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(4));
+        });
+        it("setLockUp withdraw not greater FAILURE", async () => {
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(6);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(3);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(4));
+            await expect(theoretics.setLockUp(1, 2, one.mul(2))).to.be.revertedWith('lockup epochs out of range');
+        });
+        it("setLockUp withdraw greater than 6 FAILURE", async () => {
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(6);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(3);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(4));
+            await expect(theoretics.setLockUp(7, 3, one.mul(2))).to.be.revertedWith('lockup epochs out of range');
+        });
+        it("setLockUp reward greater than 3 FAILURE", async () => {
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(6);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(3);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(4));
+            await expect(theoretics.setLockUp(6, 4, one.mul(2))).to.be.revertedWith('lockup epochs out of range');
+        });
+        it("setLockUp pegMaxUnlock lower than ceiling FAILURE", async () => {
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(6);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(3);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(4));
+            await expect(theoretics.setLockUp(6, 3, one)).to.be.revertedWith('Max peg unlock must be greater than the GAME ceiling and lower than the price of one GAME times 4.');
+        });
+        it("setLockUp pegMaxUnlock greater than 4 FAILURE", async () => {
+            expect(await theoretics.withdrawLockupEpochs()).to.equal(6);
+            expect(await theoretics.rewardLockupEpochs()).to.equal(3);
+            expect(await theoretics.pegMaxUnlock()).to.equal(one.mul(4));
+            await expect(theoretics.setLockUp(6, 3, one.mul(4).add(1))).to.be.revertedWith('Max peg unlock must be greater than the GAME ceiling and lower than the price of one GAME times 4.');
+        });
         it("getLockPercentage SUCCESS", async () => {
             await oracle.setPrice(one.mul(101).div(100));
             expect(await theoretics.getLockPercentage()).to.equal(95);
