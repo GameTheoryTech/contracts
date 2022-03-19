@@ -188,15 +188,16 @@ contract Treasury is ContractGuard {
         }
     }
 
-    function getRedeemableBonds() public view returns (uint256 _redeemableBonds) {
+    function getRedeemableBonds() external view returns (uint256) {
         uint256 _gamePrice = getGamePrice();
         if (_gamePrice > gamePriceCeiling) {
             uint256 _totalGame = IERC20(game).balanceOf(address(this));
             uint256 _rate = getBondPremiumRate();
             if (_rate > 0) {
-                _redeemableBonds = _totalGame.mul(1e18).div(_rate);
+                return _totalGame.mul(1e18).div(_rate);
             }
         }
+        return 0;
     }
 
     function getBondDiscountRate() public view returns (uint256 _rate) {
@@ -460,7 +461,7 @@ contract Treasury is ContractGuard {
         require(gamePrice == targetPrice, "Treasury: GAME price moved");
         require(
             gamePrice > gamePriceCeiling, // price > $1.01
-            "Treasury: gamePrice not eligible for bond purchase"
+            "Treasury: gamePrice not eligible for bond redemption"
         );
 
         uint256 _rate = getBondPremiumRate();

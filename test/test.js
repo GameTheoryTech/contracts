@@ -335,7 +335,7 @@ describe('treasury', function () {
 
             expect(redeemBonds).eventually.to.rejectedWith(
                 Error,
-                "VM Exception while processing transaction: reverted with reason string 'Treasury: gamePrice not eligible for bond purchase'"
+                "VM Exception while processing transaction: reverted with reason string 'Treasury: gamePrice not eligible for bond redemption'"
             );
         });
 
@@ -350,12 +350,12 @@ describe('treasury', function () {
 
             expect(redeemBonds).eventually.to.rejectedWith(
                 Error,
-                "VM Exception while processing transaction: reverted with reason string 'Treasury: gamePrice not eligible for bond purchase'"
+                "VM Exception while processing transaction: reverted with reason string 'Treasury: gamePrice not eligible for bond redemption'"
             );
         });
     });
     describe('allocateSeigniorage', () => {
-        it('allocateSeigniorage does nothing to pToken when price at $1.01; sends shares to theoretics', async function () {
+        it('allocateSeigniorage does nothing to pToken when price at $1.01', async function () {
             var daofundBalance = oneTenth;
             await pToken.transfer(daofund.address, daofundBalance);
             await oracle.setPrice(pTokenPriceCeiling);
@@ -375,7 +375,7 @@ describe('treasury', function () {
             expect(btsTheoreticsBalance).to.equal(one);
         });
 
-        it('allocateSeigniorage does nothing to pToken when price at $1.00; sends shares to theoretics', async function () {
+        it('allocateSeigniorage does nothing to pToken when price at $1.00', async function () {
             var daofundBalance = oneTenth;
             await pToken.transfer(daofund.address, daofundBalance);
             await oracle.setPrice(one);
@@ -395,7 +395,7 @@ describe('treasury', function () {
             expect(btsTheoreticsBalance).to.equal(one);
         });
 
-        it('allocateSeigniorage prints over $1.01 with no debt; sends shares to theoretics', async function () {
+        it('allocateSeigniorage prints over $1.01 with no debt', async function () {
             var daofundBalance = oneTenth;
             await pToken.transfer(daofund.address, daofundBalance);
             var oldSupply = await pToken.totalSupply();
