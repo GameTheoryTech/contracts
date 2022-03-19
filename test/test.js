@@ -889,7 +889,38 @@ describe('tests', function () {
             await treasuryDAO.allocateSeigniorage();
             expect(await treasuryDAO.shouldAllocateSeigniorage()).to.equal(false);
         });
-        // Tested lock and unlock base cases already above.
+        it('setStartTime SUCCESS', async function () {
+            await ethers.provider.send('evm_mine', []);
+            const Treasury = await smock.mock("Treasury");
+            treasuryDAO = await Treasury.deploy();
+            await treasuryDAO.deployed();
+            let timestamp = BigNumber.from(await latestBlocktime(ethers.provider));
+            startTime = timestamp.add(3600);
+            await treasuryDAO.initialize(pToken.address, bToken.address, sToken.address, oracle.address, theoretics.address, genesisPool.address, daofund.address, devfund.address, startTime);
+            await treasuryDAO.setStartTime(timestamp.add(7200));
+            expect(await treasuryDAO.startTime()).to.equal(timestamp.add(7200));
+        });
+        it('setPoolStartTime not operator FAILURE', async function () {
+            await treasuryDAO.setOperator(daofund.address);
+            await expect(treasuryDAO.setStartTime(getCurrentTimestamp())).to.be.revertedWith(
+                'Treasury: caller is not the operator'
+            );
+        });
+        it('setPoolStartTime started FAILURE', async function () {
+            await expect(treasuryDAO.setStartTime(getCurrentTimestamp())).to.be.revertedWith(
+                'Already started.'
+            );
+        });
+        it('setPoolStartTime early FAILURE', async function () {
+            await ethers.provider.send('evm_mine', []);
+            const Treasury = await smock.mock("Treasury");
+            treasuryDAO = await Treasury.deploy();
+            await treasuryDAO.deployed();
+            let timestamp = BigNumber.from(await latestBlocktime(ethers.provider));
+            startTime = timestamp.add(3600);
+            await treasuryDAO.initialize(pToken.address, bToken.address, sToken.address, oracle.address, theoretics.address, genesisPool.address, daofund.address, devfund.address, startTime);
+            await expect(treasuryDAO.setStartTime(timestamp.sub(7200))).to.be.revertedWith('Time input is too early.');
+        });
     });
     describe('Game Theory Changes: Theoretics', () => {
         it("setFeeStages SUCCESS", async () => {
@@ -1003,6 +1034,8 @@ describe('tests', function () {
             await oracle.setPrice(one.mul(2));
             expect(await theoretics.getLockPercentage()).to.equal(64);
             await oracle.setPrice(one.mul(4));
+            expect(await theoretics.getLockPercentage()).to.equal(0);
+            await oracle.setPrice(one.mul(5));
             expect(await theoretics.getLockPercentage()).to.equal(0);
         });
         it("getCurrentWithdrawEpochs SUCCESS", async () => {
