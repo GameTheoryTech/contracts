@@ -24,9 +24,9 @@ async function main() {
     // console.log("- devFund deployed to:", devFund.address);
 
     const iToken = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", "0x8D11eC38a3EB5E956B052f67Da8Bdc9bef8Abf3E");
-    const iTokenDecimals = await iToken.decimals();
+    //const iTokenDecimals = await iToken.decimals();
     console.log("- DAI:", iToken.address);
-    console.log("DAI decimals:", iTokenDecimals);
+    //console.log("DAI decimals:", iTokenDecimals);
 
     const GameToken = await hre.ethers.getContractFactory("Game");
     const pToken = await GameToken.deploy();

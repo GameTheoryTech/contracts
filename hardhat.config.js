@@ -13,6 +13,7 @@ module.exports = {
         fantom: {
             url: "https://rpc.ftm.tools",
             gasMultiplier: 2,
+            gasPrice: 200000000000,
             accounts: process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY, process.env.DAO_PRIVATE_KEY, process.env.DEV_PRIVATE_KEY] : [],
         },
         fantomtest: {
