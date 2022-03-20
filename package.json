@@ -7,7 +7,9 @@
     "test": "hardhat test",
     "deploy": "hardhat run --network fantom scripts/deploy.js",
     "deployTest": "hardhat run --network fantomtest scripts/deployTest.js",
-    "addPoolsTest": "hardhat run --network fantomtest scripts/addPoolsTest.js"
+    "addPoolsTest": "hardhat run --network fantomtest scripts/addPoolsTest.js",
+    "verify": "hardhat run --network fantom scripts/verify.js",
+    "flatten": "hardhat flatten contracts/distribution/TheoryRewardPool.sol > TheoryRewardPoolFlattened.sol"
   },
   "keywords": [],
   "author": "",
@@ -24,7 +26,8 @@
     "dotenv": "^16.0.0",
     "ethjs-util": "^0.1.6",
     "hardhat": "^2.8.2",
-    "hardhat-abi-exporter": "^2.8.0"
+    "hardhat-abi-exporter": "^2.8.0",
+    "hardhat-etherscan": "^1.0.1"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",

@@ -2,3 +2,4 @@
 security.json
 cache/solidity-files-cache.json
 **/node_modules
+TheoryRewardPoolFlattened.sol

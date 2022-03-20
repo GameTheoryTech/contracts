@@ -2,6 +2,7 @@ require("@nomiclabs/hardhat-waffle")
 require("@nomiclabs/hardhat-etherscan")
 require("dotenv").config()
 require("hardhat-abi-exporter");
+require("@nomiclabs/hardhat-etherscan");
 
 module.exports = {
     networks: {
@@ -21,6 +22,9 @@ module.exports = {
             gasMultiplier: 2,
             accounts: process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY, process.env.DAO_PRIVATE_KEY, process.env.DEV_PRIVATE_KEY] : [],
         },
+    },
+    etherscan: {
+        apiKey: process.env.SCAN_API_KEY
     },
     solidity: {
         compilers: [{
