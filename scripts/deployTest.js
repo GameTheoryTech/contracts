@@ -121,7 +121,7 @@ async function main() {
     //TODO: In prod, change start times.
     await treasuryDAO.initialize(pToken.address, bToken.address, sToken.address, oracle.address, theoretics.address, genesisPool.address, daofund.address, devfund.address, startTime);
     await theoretics.initialize(pToken.address, sToken.address, treasuryDAO.address, theoryRewardPool.address);
-    await pToken.distributeReward(genesisPool.address)
+    await pToken.distributeReward(genesisPool.address, theoretics.address)
     await sToken.distributeReward(theoryRewardPool.address)
 
     await genesisPool.add(7500,

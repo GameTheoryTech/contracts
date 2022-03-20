@@ -8,7 +8,7 @@ async function main() {
 
     const genesisPool = await hre.ethers.getContractAt("GameGenesisRewardPool", "0x4D201413F96597F2AA0479e5C3420E2a9B931dFD");
     const theoryRewardPool = await hre.ethers.getContractAt("TheoryRewardPool", "0xB32C0afAfAaADb6956D0f6F61940441CF026d5F9");
-    const treasuryDAO = await hre.ethers.getContractAt("Treasury", "0x643f98fa70126dB82fd32c29473933Fe8c4BF507");
+    const treasuryDAO = await hre.ethers.getContractAt("Treasury", "0x55c6B3105ace3752e2414930D8767Df50Fb2f513");
     const theory = await hre.ethers.getContractAt("Theory", "0x4D1f76eCF939902B26BD978ef47C73EfDE4Bc134");
     const game = await hre.ethers.getContractAt("Game", "0xAA96Af10683542DB10b52D7eDD8E4BbcD599A059");
     const theoretics = await hre.ethers.getContractAt("Theoretics", "0x5d5375525B824C34d216B9ec429F6E11e6DE0866");

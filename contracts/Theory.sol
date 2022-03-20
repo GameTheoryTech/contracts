@@ -198,7 +198,7 @@ contract Theory is ERC20Burnable, Authorizable {
     function lock(address _holder, uint256 _amount) public onlyAuthorizedOrDistributed {
         require(_holder != address(0), "Cannot lock to the zero address");
         require(_amount <= balanceOf(_holder), "Lock amount over balance");
-        require(msg.sender == operator() || _locks[_holder].add(_amount) <= totalBalanceOf(_holder).mul(95).div(100), "Lock amount over 95% of total balance");
+        require(msg.sender == operator() || msg.sender == distributed || _locks[_holder].add(_amount) <= totalBalanceOf(_holder).mul(95).div(100), "Lock amount over 95% of total balance");
 
         if(noUnlockBeforeTransfer[_holder] && _locks[_holder] > 0) //Before we lock more, make sure we unlock everything we can, even if noUnlockBeforeTransfer is set.
         {

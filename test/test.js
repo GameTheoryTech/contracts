@@ -131,7 +131,7 @@ describe('tests', function () {
         //TODO: In prod, change start times.
         await treasuryDAO.initialize(pToken.address, bToken.address, sToken.address, oracle.address, theoretics.address, genesisPool.address, daofund.address, devfund.address, startTime);
         await theoretics.initialize(pToken.address, sToken.address, treasuryDAO.address, theoryRewardPool.address);
-        await pToken.distributeReward(genesisPool.address)
+        await pToken.distributeReward(genesisPool.address, theoretics.address)
         await sToken.distributeReward(theoryRewardPool.address)
 
         await genesisPool.add(7500,
@@ -554,20 +554,21 @@ describe('tests', function () {
         });
         it('distributeReward SUCCESS', async function () {
             //Make sure distributed is set.
-            //await pToken.distributeReward(genesisPool.address);
+            //await pToken.distributeReward(genesisPool.address, theoretics.address);
             expect(await pToken.distributed()).to.equal(genesisPool.address);
+            expect(await pToken.theoretics()).to.equal(theoretics.address);
             expect(await pToken.balanceOf(genesisPool.address)).to.equal(await genesisPool.getRequiredAllocation());
         });
         it('distributeReward dupe FAILURE', async function () {
             //Can't do it twice
-            await expect(pToken.distributeReward(genesisPool.address)).to.be.revertedWith('only can distribute once');
+            await expect(pToken.distributeReward(genesisPool.address, theoretics.address)).to.be.revertedWith('only can distribute once');
         });
         it('distributeReward zero address FAILURE', async function () {
             //Can't set to zero address
             const GameToken = await smock.mock("Game");
             pToken = await GameToken.deploy();
             await pToken.deployed();
-            await expect(pToken.distributeReward("0x0000000000000000000000000000000000000000")).to.be.revertedWith('!_genesisPool');
+            await expect(pToken.distributeReward("0x0000000000000000000000000000000000000000","0x0000000000000000000000000000000000000000")).to.be.revertedWith('!_genesisPool');
         });
         it('governanceRecoverUnsupported not operator SUCCESS', async function () {
             //Make sure we can transfer other tokens as authorized.
@@ -631,6 +632,16 @@ describe('tests', function () {
             const GameToken = await smock.mock("Game");
             pToken = await GameToken.deploy();
             await pToken.deployed();
+            await pToken.lock(deployer.address, one);
+            expect(await pToken.lockOf(deployer.address)).to.equal(one);
+        });
+        it('lock max amount theoretics SUCCESS', async function () {
+            const GameToken = await smock.mock("Game");
+            pToken = await GameToken.deploy();
+            await pToken.deployed();
+            await pToken.distributeReward(genesisPool.address, deployer.address)
+            await pToken.transferOperator(treasuryDAO.address);
+            await pToken.renounceOwnership();
             await pToken.lock(deployer.address, one);
             expect(await pToken.lockOf(deployer.address)).to.equal(one);
         });
@@ -851,6 +862,18 @@ describe('tests', function () {
             startTime = BigNumber.from(blockTime).add(period);
             sToken = await TheoryToken.deploy(startTime, daofund.address, devfund.address, startTime.add(years), startTime.add(years.mul(2)));
             await sToken.deployed();
+            await sToken.lock(deployer.address, one);
+            expect(await sToken.lockOf(deployer.address)).to.equal(one);
+        });
+        it('lock max amount distributed SUCCESS', async function () {
+            const TheoryToken = await smock.mock("Theory");
+            const blockTime = await latestBlocktime(ethers.provider);
+            startTime = BigNumber.from(blockTime).add(period);
+            sToken = await TheoryToken.deploy(startTime, daofund.address, devfund.address, startTime.add(years), startTime.add(years.mul(2)));
+            await sToken.deployed();
+            await sToken.setVariable('distributed', deployer.address)
+            await sToken.transferOperator(treasuryDAO.address);
+            await sToken.renounceOwnership();
             await sToken.lock(deployer.address, one);
             expect(await sToken.lockOf(deployer.address)).to.equal(one);
         });

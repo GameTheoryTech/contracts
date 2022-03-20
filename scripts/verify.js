@@ -14,13 +14,13 @@ async function main() {
     const years = days.mul(365);
 
     await hre.run("verify:verify", {
-        address: '0xe5c495DEE0A78a12e44d946b7E9931d46B35dF62',
+        address: '0x56EbFC2F3873853d799C155AF9bE9Cb8506b7817',
         constructorArguments: [
         ],
     });
 
     await hre.run("verify:verify", {
-        address: '0x02e808efd8a8cb8af0719c5270c64ab462535db7',
+        address: '0xFfF54fcdFc0E4357be9577D8BC2B4579ce9D5C88',
         constructorArguments: [
         ],
     });
@@ -30,35 +30,35 @@ async function main() {
     const theoreticsStartTime = BigNumber.from(Math.floor(new Date('2022-03-28T12:00:00Z') / 1000));
 
     await hre.run("verify:verify", {
-        address: '0xDbF138c66cbacd169017d8bEcFBBEeD84f6e6315',
+        address: '0x60787C689ddc6edfc84FCC9E7d6BD21990793f06',
         constructorArguments: [
             theoryStartTime, daofund.address, devfund.address, theoryStartTime.add(years), theoryStartTime.add(years.mul(2))
         ],
     });
 
     await hre.run("verify:verify", {
-        address: '0x23Dc7737839E3C269F40fCF714f63781188caca1',
+        address: '0x98F5cdda1489503e755Da30BEc5FCD341C949791',
         constructorArguments: [
         ],
     });
 
     await hre.run("verify:verify", {
-        address: '0x57946Ca8796e2E77CB6b0836C5F98b3dF3282AEb',
+        address: '0x670433FB874d4B7b94CF1D16E95fa241474E6787',
         constructorArguments: [
         ],
     });
 
     await hre.run("verify:verify", {
-        address: '0x69b41c842b1285fBE60da6095B906C017c5D27A7',
+        address: '0x9D5D593Cf8FB6bF3Edb1c1D6dAf37714aF1A0F6C',
         constructorArguments: [
-            '0xe5c495DEE0A78a12e44d946b7E9931d46B35dF62', '0x23Dc7737839E3C269F40fCF714f63781188caca1', genesisStartTime
+            '0x56EbFC2F3873853d799C155AF9bE9Cb8506b7817', '0x98F5cdda1489503e755Da30BEc5FCD341C949791', genesisStartTime
         ],
     });
 
     // await hre.run("verify:verify", {
     //     address: '0x55DA8eC723D6300184770A7F3E8902d6eb524bA8',
     //     constructorArguments: [
-    //         '0xDbF138c66cbacd169017d8bEcFBBEeD84f6e6315',
+    //         '0x60787C689ddc6edfc84FCC9E7d6BD21990793f06',
     //         '0x23Dc7737839E3C269F40fCF714f63781188caca1',
     //         theoryStartTime,
     //         weeks, // 7 days
@@ -68,9 +68,9 @@ async function main() {
     // });
 
     await hre.run("verify:verify", {
-        address: '0x8d71d82699D82cBbA1442daf28A17EF1154a5416',
+        address: '0x9BCcC82c7fCdb24B57B4BE33f33AE82EBcaf464d',
         constructorArguments: [
-            '0xBED27D20AB6C23003498184969A7982Cd8c68551',
+            '0x168e509FE5aae456cDcAC39bEb6Fd56B6cb8912e',
             hours.mul(6),
             theoreticsStartTime
         ],

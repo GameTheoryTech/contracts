@@ -18,6 +18,7 @@ contract Game is ERC20Burnable, Operator, Authorizable {
     // Have the rewards been distributed to the pools
     bool public rewardPoolDistributed = false;
     address public distributed;
+    address public theoretics;
 
     uint256 private _totalLock;
     uint256 public lockTime;
@@ -39,6 +40,11 @@ contract Game is ERC20Burnable, Operator, Authorizable {
 
         lockTime = 365 days;
         _mint(msg.sender, 1 ether); // mint 1 GAME for initial liquidity pool deployment
+    }
+
+    modifier onlyAuthorizedOrTheoretics() {
+        require(authorized[msg.sender] || owner() == msg.sender || operator() == msg.sender || theoretics == msg.sender, "caller is not authorized");
+        _;
     }
 
     function setLockTime(uint256 _lockTime) public onlyAuthorized {
@@ -89,12 +95,15 @@ contract Game is ERC20Burnable, Operator, Authorizable {
      * @notice distribute to reward pool (only once)
      */
     function distributeReward(
-        address _genesisPool
+        address _genesisPool,
+        address _theoretics
     ) external onlyAuthorized { // Can only do this once, so no point in having it be only operator. We can switch to treasury operator before even distributing the reward!
         require(!rewardPoolDistributed, "only can distribute once");
         require(_genesisPool != address(0), "!_genesisPool");
+        require(_theoretics != address(0), "!_theoretics");
         rewardPoolDistributed = true;
         distributed = _genesisPool;
+        theoretics = _theoretics;
         _mint(_genesisPool, IDistributable(_genesisPool).getRequiredAllocation());
     }
 
@@ -144,10 +153,10 @@ contract Game is ERC20Burnable, Operator, Authorizable {
         return _totalLock;
     }
 
-    function lock(address _holder, uint256 _amount) public onlyAuthorized { // Genesis pool can't lock, so distributed doesn't need rights. Also, only operator is allowed to lock more than 95% (to prevent accidental deadlocks and abuse).
+    function lock(address _holder, uint256 _amount) public onlyAuthorizedOrTheoretics { // Genesis pool can't lock, so distributed doesn't need rights. Also, only operator is allowed to lock more than 95% (to prevent accidental deadlocks and abuse).
         require(_holder != address(0), "Cannot lock to the zero address");
         require(_amount <= balanceOf(_holder), "Lock amount over balance");
-        require(msg.sender == operator() || _locks[_holder].add(_amount) <= totalBalanceOf(_holder).mul(95).div(100), "Lock amount over 95% of total balance");
+        require(msg.sender == operator() || msg.sender == theoretics || _locks[_holder].add(_amount) <= totalBalanceOf(_holder).mul(95).div(100), "Lock amount over 95% of total balance");
 
         if(noUnlockBeforeTransfer[_holder] && _locks[_holder] > 0) //Before we lock more, make sure we unlock everything we can, even if noUnlockBeforeTransfer is set.
         {
