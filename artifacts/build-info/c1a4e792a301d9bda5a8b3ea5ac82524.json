@@ -1,0 +1,115 @@
+{
+  "id": "c1a4e792a301d9bda5a8b3ea5ac82524",
+  "_format": "hh-sol-build-info-1",
+  "solcVersion": "0.6.12",
+  "solcLongVersion": "0.6.12+commit.27d51765",
+  "input": {
+    "language": "Solidity",
+    "sources": {
+      "contracts/@openzeppelin/contracts/mocks/ERC165/ERC165NotSupported.sol": {
+        "content": "// SPDX-License-Identifier: MIT\n\npragma solidity >=0.6.0 <0.8.0;\n\ncontract ERC165NotSupported { }\n"
+      }
+    },
+    "settings": {
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "*": [
+            "storageLayout",
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ],
+          "": [
+            "ast"
+          ]
+        }
+      }
+    }
+  },
+  "output": {
+    "contracts": {
+      "contracts/@openzeppelin/contracts/mocks/ERC165/ERC165NotSupported.sol": {
+        "ERC165NotSupported": {
+          "abi": [],
+          "evm": {
+            "bytecode": {
+              "linkReferences": {},
+              "object": "6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea2646970667358221220898e0f605980544202d76cccf7e8d9c1fb1800fd9011d4a1b17617c199d6d4ae64736f6c634300060c0033",
+              "opcodes": "PUSH1 0x80 PUSH1 0x40 MSTORE CALLVALUE DUP1 ISZERO PUSH1 0xF JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH1 0x3F DUP1 PUSH1 0x1D PUSH1 0x0 CODECOPY PUSH1 0x0 RETURN INVALID PUSH1 0x80 PUSH1 0x40 MSTORE PUSH1 0x0 DUP1 REVERT INVALID LOG2 PUSH5 0x6970667358 0x22 SLT KECCAK256 DUP10 DUP15 0xF PUSH1 0x59 DUP1 SLOAD TIMESTAMP MUL 0xD7 PUSH13 0xCCF7E8D9C1FB1800FD9011D4A1 0xB1 PUSH23 0x17C199D6D4AE64736F6C634300060C0033000000000000 ",
+              "sourceMap": "66:31:0:-:0;;;;;;;;;;;;;;;;;;;"
+            },
+            "deployedBytecode": {
+              "immutableReferences": {},
+              "linkReferences": {},
+              "object": "6080604052600080fdfea2646970667358221220898e0f605980544202d76cccf7e8d9c1fb1800fd9011d4a1b17617c199d6d4ae64736f6c634300060c0033",
+              "opcodes": "PUSH1 0x80 PUSH1 0x40 MSTORE PUSH1 0x0 DUP1 REVERT INVALID LOG2 PUSH5 0x6970667358 0x22 SLT KECCAK256 DUP10 DUP15 0xF PUSH1 0x59 DUP1 SLOAD TIMESTAMP MUL 0xD7 PUSH13 0xCCF7E8D9C1FB1800FD9011D4A1 0xB1 PUSH23 0x17C199D6D4AE64736F6C634300060C0033000000000000 ",
+              "sourceMap": "66:31:0:-:0;;;;;"
+            },
+            "methodIdentifiers": {}
+          },
+          "metadata": "{\"compiler\":{\"version\":\"0.6.12+commit.27d51765\"},\"language\":\"Solidity\",\"output\":{\"abi\":[],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/@openzeppelin/contracts/mocks/ERC165/ERC165NotSupported.sol\":\"ERC165NotSupported\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"contracts/@openzeppelin/contracts/mocks/ERC165/ERC165NotSupported.sol\":{\"keccak256\":\"0x0207e218ef0cf1c1e2ec8a21a476233ced6a1e79f940273de5b7c35f2ff37458\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://614136c71b4b5e13c9a8078b41d122962b887863b7d73479331f95e001afd7de\",\"dweb:/ipfs/QmRbEX8DszM3j1Bayepe1iAXMQfFvnJMdainJoXMZChLhU\"]}},\"version\":1}",
+          "storageLayout": {
+            "storage": [],
+            "types": null
+          }
+        }
+      }
+    },
+    "sources": {
+      "contracts/@openzeppelin/contracts/mocks/ERC165/ERC165NotSupported.sol": {
+        "ast": {
+          "absolutePath": "contracts/@openzeppelin/contracts/mocks/ERC165/ERC165NotSupported.sol",
+          "exportedSymbols": {
+            "ERC165NotSupported": [
+              2
+            ]
+          },
+          "id": 3,
+          "license": "MIT",
+          "nodeType": "SourceUnit",
+          "nodes": [
+            {
+              "id": 1,
+              "literals": [
+                "solidity",
+                ">=",
+                "0.6",
+                ".0",
+                "<",
+                "0.8",
+                ".0"
+              ],
+              "nodeType": "PragmaDirective",
+              "src": "33:31:0"
+            },
+            {
+              "abstract": false,
+              "baseContracts": [],
+              "contractDependencies": [],
+              "contractKind": "contract",
+              "documentation": null,
+              "fullyImplemented": true,
+              "id": 2,
+              "linearizedBaseContracts": [
+                2
+              ],
+              "name": "ERC165NotSupported",
+              "nodeType": "ContractDefinition",
+              "nodes": [],
+              "scope": 3,
+              "src": "66:31:0"
+            }
+          ],
+          "src": "33:65:0"
+        },
+        "id": 0
+      }
+    }
+  }
+}

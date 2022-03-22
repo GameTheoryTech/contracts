@@ -9,7 +9,9 @@
     "deployTest": "hardhat run --network fantomtest scripts/deployTest.js",
     "addPoolsTest": "hardhat run --network fantomtest scripts/addPoolsTest.js",
     "verify": "hardhat run --network fantom scripts/verify.js",
-    "flatten": "hardhat flatten contracts/distribution/TheoryRewardPool.sol > TheoryRewardPoolFlattened.sol"
+    "flatten": "hardhat flatten contracts/distribution/TheoryRewardPool.sol > TheoryRewardPoolFlattened.sol",
+    "allocateSeigniorage": "hardhat run --network fantom scripts/allocateSeigniorageBot.js",
+    "discord": "hardhat run --network fantom scripts/discordBot.js"
   },
   "keywords": [],
   "author": "",
@@ -21,8 +23,11 @@
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "npm:@openzeppelin/contracts@^3.4.1ya",
     "@openzeppelin/contracts-0.8": "npm:@openzeppelin/contracts@^4.4.2",
+    "@spookyswap/sdk": "file:../spookyswap-sdk",
+    "axios": "^0.26.1",
     "chai": "^4.3.6",
     "chai-as-promised": "^7.1.1",
+    "discord.js": "^13.6.0",
     "dotenv": "^16.0.0",
     "ethjs-util": "^0.1.6",
     "hardhat": "^2.8.2",
