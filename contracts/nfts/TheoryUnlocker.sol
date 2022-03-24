@@ -31,10 +31,10 @@ contract TheoryUnlocker is ERC721, Authorizable, ContractGuard {
     uint256[] public maxLevelTime; // Used like feeStageTime
     uint256[] public maxLevelLevel; // Used like feeStagePercentage
     IERC20 public buyToken;
-    uint256 initialPrice; //Price for level 1.
-    uint256 buyTokenPerLevel;
-    address communityFund;
-    uint256 timeToLevel;
+    uint256 public initialPrice; //Price for level 1.
+    uint256 public buyTokenPerLevel;
+    address public communityFund;
+    uint256 public timeToLevel;
     IERC20Lockable public theory;
 
     //Construction
