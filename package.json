@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "hardhat test",
+    "forkTest": "hardhat test test/test.js",
+    "nftTest": "hardhat test test/nftTest.js",
     "deploy": "hardhat run --network fantom scripts/deploy.js",
     "deployTest": "hardhat run --network fantomtest scripts/deployTest.js",
     "addPoolsTest": "hardhat run --network fantomtest scripts/addPoolsTest.js",

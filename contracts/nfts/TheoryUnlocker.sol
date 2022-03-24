@@ -106,7 +106,7 @@ contract TheoryUnlocker is ERC721, Authorizable, ContractGuard {
         maxLevelLevel = _maxLevelLevel;
     }
 
-    function setCommunityFund(uint256 _fund) public onlyAuthorized
+    function setCommunityFund(address _fund) public onlyAuthorized
     {
         communityFund = _fund;
     }
