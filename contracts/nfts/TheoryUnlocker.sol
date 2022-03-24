@@ -37,7 +37,7 @@ contract TheoryUnlocker is ERC721, Authorizable, ContractGuard {
     uint256 timeToLevel;
     IERC20Lockable public theory;
 
-
+    //Construction
     constructor(IERC20 _buy, uint256 _initialBuy, uint256 _buyPerLevel, IERC20Lockable _theory, address _communityFund, uint256[] memory _maxLevelTime, uint256[] memory _maxLevelLevel, uint256[] memory _levelURIsLevel, string[] memory _levelURIsURI) ERC721("THEORY Unlocker", "GU") public {
         buyToken = _buy;
         initialPrice = _initialBuy;
@@ -65,22 +65,83 @@ contract TheoryUnlocker is ERC721, Authorizable, ContractGuard {
         theory = _theory;
     }
 
-    //setBuyToken
-    //setInitialPrice
-    //setBuyTokenPerLevel
-    //setLevelURIs
-    //setMaxLevel
-    //setCommunityFund
-    //setTheory? //Maybe not, can't think of a reason why we'd need this as THEORY can't be redeployed.
-    //setTimeToLevel
-    //setTokenLevel
-    //setCreationTime
-    //setLastLevelTime
-    //setLastUnlockTime
-    //setLastLockOf
-    //setLevelUpStartTime
-    //setLevelUpdateTime
+    //Administrative functions
+    function setBuyToken(IERC20 _buy) public onlyAuthorized
+    {
+        buyToken = _buy;
+    }
 
+    function setInitialPrice(uint256 _initial) public onlyAuthorized
+    {
+        initialPrice = _initial;
+    }
+
+    function setBuyTokenPerLevel(uint256 _perLevel) public onlyAuthorized
+    {
+        buyTokenPerLevel = _perLevel;
+    }
+
+    function setLevelURIs(uint256[] memory _levelURIsLevel, string[] memory _levelURIsURI) public onlyAuthorized
+    {
+        require(_levelURIsLevel.length > 0
+        && _levelURIsLevel[0] == 0
+            && _levelURIsURI.length == _levelURIsLevel.length,
+            "Level URI arrays must be equal in non-zero length and level should start at 0.");
+        levelURIsLevel = _levelURIsLevel;
+        levelURIsURI = _levelURIsURI;
+    }
+    function setMaxLevel(uint256[] memory _maxLevelTime, uint256[] memory _maxLevelLevel) public onlyAuthorized
+    {
+        require(_maxLevelTime.length > 0
+        && _maxLevelTime[0] == 0
+            && _maxLevelLevel.length == _maxLevelTime.length,
+            "Max level arrays must be equal in non-zero length and time should start at 0.");
+        uint256 i;
+        uint256 len = _maxLevelLevel.length;
+        for(i = 0; i < len; i += 1)
+        {
+            require(_maxLevelLevel[i] <= 100, "Max level can't be higher than 100."); //In practice, this will be 50, but there is no point in making it lower here, does more harm than good.
+        }
+        maxLevelTime = _maxLevelTime;
+        maxLevelLevel = _maxLevelLevel;
+    }
+
+    function setCommunityFund(uint256 _fund) public onlyAuthorized
+    {
+        communityFund = _fund;
+    }
+    //setTheory? //Maybe not, can't think of a reason why we'd need this as THEORY can't be redeployed.
+    function setTimeToLevel(uint256 _time) public onlyAuthorized
+    {
+        timeToLevel = _time;
+    }
+
+    function setTokenLevel(uint256 tokenId, uint256 level) public onlyAuthorized
+    {
+        tokenLevels[tokenId] = level;
+    }
+
+    function setCreationTime(uint256 tokenId, uint256 time) public onlyAuthorized
+    {
+        creationTime[tokenId] = time;
+    }
+
+    function setLastLevelTime(uint256 tokenId, uint256 time) public onlyAuthorized
+    {
+        lastLevelTime[tokenId] = time;
+    }
+
+    function setLastUnlockTime(address user, uint256 time) public onlyAuthorized
+    {
+        lastUnlockTime[user] = time;
+    }
+
+    function setLastLockOf(address user, uint256 time) public onlyAuthorized
+    {
+        lastLockOf[user] = time;
+    }
+
+    //Data functions
     function maxLevel() public view returns (uint256)
     {
         uint256 maxLevel = 0;
@@ -115,6 +176,27 @@ contract TheoryUnlocker is ERC721, Authorizable, ContractGuard {
         return URI;
     }
 
+    function costOf(uint256 level) external view returns (uint256)
+    {
+        return initialPrice.add(buyTokenPerLevel.mul(level.sub(1)));
+    }
+
+    function timeLeftToLevel(uint256 tokenId) external view returns (uint256)
+    {
+        uint256 nextLevelTime = lastLevelTime[tokenId].add(timeToLevel);
+        if(block.timestamp >= nextLevelTime)
+        {
+            return 0;
+        }
+        return nextLevelTime.sub(block.timestamp);
+    }
+
+    function nextLevelTime(uint256 tokenId) external view returns (uint256)
+    {
+        return lastLevelTime[tokenId].add(timeToLevel);
+    }
+
+    //Core functionality
     function mint(uint256 level) onlyOneBlock public returns (uint256) {
         require(level > 0 && level <= maxLevel(), "Level must be > 0 and <= max level.");
         address player = msg.sender;
@@ -179,8 +261,8 @@ contract TheoryUnlocker is ERC721, Authorizable, ContractGuard {
     }
 
     //Should be called:
-    //When lockOf(player) == 0 - Instead of theory.unlock()
-    //When lockOf(player) <= theory.canUnlockAmount(player) - After theory.unlock() [to avoid revert]
+    //When lockOf(player) == 0 - Instead of theory.unlock() [disabled on website]
+    //When lockOf(player) <= theory.canUnlockAmount(player) - After theory.unlock() [to avoid revert, knew I should have listened to my gut and put a check for the second _unlock]
     //When lockOf(player) > theory.canUnlockAmount(player) - Instead of theory.unlock()
     function nftUnlock(uint256 tokenId) onlyOneBlock public { //Find the best tokenId to use off the blockchain using tokenOfOwnerByIndex and balanceOf
         require(ownerOf(tokenId) == msg.sender || authorized[msg.sender] || owner() == msg.sender || operator() == msg.sender, "Not enough permissions.");
