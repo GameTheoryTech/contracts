@@ -238,5 +238,230 @@ describe('nftTests', function () {
             await theoryUnlocker.renounceOwnership();
             await expect(theoryUnlocker.setBuyToken(sToken.address)).to.be.revertedWith('caller is not authorized');
         });
+        it("setInitialPrice SUCCESS", async () => {
+            await theoryUnlocker.setInitialPrice(one);
+            expect(await theoryUnlocker.initialPrice()).to.equal(one);
+        });
+        it("setInitialPrice not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setInitialPrice(one)).to.be.revertedWith('caller is not authorized');
+        });
+        it("setBuyTokenPerLevel SUCCESS", async () => {
+            await theoryUnlocker.setBuyTokenPerLevel(one);
+            expect(await theoryUnlocker.buyTokenPerLevel()).to.equal(one);
+        });
+        it("setBuyTokenPerLevel not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setBuyTokenPerLevel(one)).to.be.revertedWith('caller is not authorized');
+        });
+        it("setLevelURIs SUCCESS", async () => {
+            await theoryUnlocker.setLevelURIs([zero,BigNumber.from(70)],["blah", "something"]);
+            expect(await theoryUnlocker.levelURIsLevel(1)).to.equal(BigNumber.from(70));
+            expect(await theoryUnlocker.levelURIsURI(1)).to.equal("something");
+        });
+        it("setLevelURIs zero length FAILURE", async () => {
+            await expect(theoryUnlocker.setLevelURIs([],[])).to.be.revertedWith('Level URI arrays must be equal in non-zero length and level should start at 0.');
+        });
+        it("setLevelURIs not zero FAILURE", async () => {
+            await expect(theoryUnlocker.setLevelURIs([one,BigNumber.from(70)],["blah", "something"])).to.be.revertedWith('Level URI arrays must be equal in non-zero length and level should start at 0.');
+        });
+        it("setLevelURIs not equal length FAILURE", async () => {
+            await expect(theoryUnlocker.setLevelURIs([zero],["blah", "something"])).to.be.revertedWith('Level URI arrays must be equal in non-zero length and level should start at 0.');
+        });
+        it("setLevelURIs not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setLevelURIs([zero,BigNumber.from(70)],["blah", "something"])).to.be.revertedWith('caller is not authorized');
+        });
+        it("setMaxLevel SUCCESS", async () => {
+            await theoryUnlocker.setMaxLevel([zero,hours],[BigNumber.from(50),BigNumber.from(100)]);
+            expect(await theoryUnlocker.maxLevelTime(1)).to.equal(hours);
+            expect(await theoryUnlocker.maxLevelLevel(1)).to.equal(BigNumber.from(100));
+        });
+        it("setMaxLevel zero length FAILURE", async () => {
+            await expect(theoryUnlocker.setMaxLevel([],[])).to.be.revertedWith('Max level arrays must be equal in non-zero length and time should start at 0.');
+        });
+        it("setMaxLevel not zero FAILURE", async () => {
+            await expect(theoryUnlocker.setMaxLevel([minutes,hours],[BigNumber.from(25),BigNumber.from(50)])).to.be.revertedWith('Max level arrays must be equal in non-zero length and time should start at 0.');
+        });
+        it("setMaxLevel not equal length FAILURE", async () => {
+            await expect(theoryUnlocker.setMaxLevel([zero,hours],[BigNumber.from(50)])).to.be.revertedWith('Max level arrays must be equal in non-zero length and time should start at 0.');
+        });
+        it("setMaxLevel > 100 FAILURE", async () => {
+            await expect(theoryUnlocker.setMaxLevel([zero,hours],[BigNumber.from(25),BigNumber.from(999)])).to.be.revertedWith("Max level can't be higher than 100.");
+        });
+        it("setMaxLevel not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setMaxLevel([zero,hours],[BigNumber.from(25),BigNumber.from(50)])).to.be.revertedWith('caller is not authorized');
+        });
+        it("setCommunityFund SUCCESS", async () => {
+            await theoryUnlocker.setCommunityFund(devfund.address);
+            expect(await theoryUnlocker.communityFund()).to.equal(devfund.address);
+        });
+        it("setCommunityFund not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setCommunityFund(devfund.address)).to.be.revertedWith('caller is not authorized');
+        });
+        it("setTimeToLevel SUCCESS", async () => {
+            await theoryUnlocker.setTimeToLevel(hours);
+            expect(await theoryUnlocker.timeToLevel()).to.equal(hours);
+        });
+        it("setTimeToLevel not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setTimeToLevel(hours)).to.be.revertedWith('caller is not authorized');
+        });
+        it("setTokenLevel SUCCESS", async () => {
+            await theoryUnlocker.setTokenLevel(BigNumber.from(1), BigNumber.from(5));
+            expect((await theoryUnlocker.tokenInfo(BigNumber.from(1))).level).to.equal(BigNumber.from(5));
+        });
+        it("setTokenLevel zero FAILURE", async () => {
+            await expect(theoryUnlocker.setTokenLevel(BigNumber.from(1), BigNumber.from(0))).to.be.revertedWith('Level must be > 0 and <= max level.');
+        });
+        it("setTokenLevel greater than max FAILURE", async () => {
+            await expect(theoryUnlocker.setTokenLevel(BigNumber.from(1), BigNumber.from(6))).to.be.revertedWith('Level must be > 0 and <= max level.');
+        });
+        it("setTokenLevel not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setTokenLevel(BigNumber.from(1), BigNumber.from(5))).to.be.revertedWith('caller is not authorized');
+        });
+        it("setCreationTime SUCCESS", async () => {
+            await theoryUnlocker.setCreationTime(BigNumber.from(1), hours);
+            expect((await theoryUnlocker.tokenInfo(BigNumber.from(1))).creationTime).to.equal(hours);
+        });
+        it("setCreationTime not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setCreationTime(BigNumber.from(1), hours)).to.be.revertedWith('caller is not authorized');
+        });
+        it("setLastLevelTime SUCCESS", async () => {
+            await theoryUnlocker.setLastLevelTime(BigNumber.from(2), minutes);
+            expect((await theoryUnlocker.tokenInfo(BigNumber.from(2))).lastLevelTime).to.equal(minutes);
+        });
+        it("setLastLevelTime not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setLastLevelTime(BigNumber.from(2), minutes)).to.be.revertedWith('caller is not authorized');
+        });
+        it("setLastUnlockTime SUCCESS", async () => {
+            await theoryUnlocker.setLastUnlockTime(devfund.address, minutes);
+            expect((await theoryUnlocker.userInfo(devfund.address)).lastUnlockTime).to.equal(minutes);
+        });
+        it("setLastUnlockTime not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setLastUnlockTime(devfund.address, minutes)).to.be.revertedWith('caller is not authorized');
+        });
+        it("setLastLockAmount SUCCESS", async () => {
+            await theoryUnlocker.setLastLockAmount(devfund.address, oneHundred);
+            expect((await theoryUnlocker.userInfo(devfund.address)).lastLockAmount).to.equal(oneHundred);
+        });
+        it("setLastLockAmount not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setLastLockAmount(devfund.address, oneHundred)).to.be.revertedWith('caller is not authorized');
+        });
+        it("maxLevel SUCCESS", async () => {
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(5));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(10));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(15));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(20));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(25));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(30));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(35));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(40));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(45));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(50));
+            await advanceTime(ethers.provider, days.mul(15).toNumber());
+            await ethers.provider.send('evm_mine');
+            expect(await theoryUnlocker.maxLevel()).to.equal(BigNumber.from(50));
+        });
+        it("levelURI SUCCESS", async () => {
+            expect(await theoryUnlocker.levelURI(1)).to.equal("bronze");
+            expect(await theoryUnlocker.levelURI(10)).to.equal("bronze");
+            expect(await theoryUnlocker.levelURI(20)).to.equal("silver");
+            expect(await theoryUnlocker.levelURI(30)).to.equal("silver");
+            expect(await theoryUnlocker.levelURI(40)).to.equal("gold");
+            expect(await theoryUnlocker.levelURI(45)).to.equal("gold");
+            expect(await theoryUnlocker.levelURI(50)).to.equal("platinum");
+            expect(await theoryUnlocker.levelURI(100)).to.equal("platinum");
+        });
+        it("costOf SUCCESS", async () => {
+            expect(await theoryUnlocker.costOf(1)).to.equal(oneHundred);
+            expect(await theoryUnlocker.costOf(2)).to.equal(oneHundred.add(oneHundred.mul(5)));
+            expect(await theoryUnlocker.costOf(10)).to.equal(oneHundred.add(oneHundred.mul(5).mul(9)));
+            expect(await theoryUnlocker.costOf(20)).to.equal(oneHundred.add(oneHundred.mul(5).mul(19)));
+            expect(await theoryUnlocker.costOf(30)).to.equal(oneHundred.add(oneHundred.mul(5).mul(29)));
+            expect(await theoryUnlocker.costOf(40)).to.equal(oneHundred.add(oneHundred.mul(5).mul(39)));
+            expect(await theoryUnlocker.costOf(50)).to.equal(oneHundred.add(oneHundred.mul(5).mul(49)));
+            expect(await theoryUnlocker.costOf(100)).to.equal(oneHundred.add(oneHundred.mul(5).mul(99)));
+        });
+        it("timeLeftToLevel SUCCESS", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            await theoryUnlocker.mint(1);
+            expect(await theoryUnlocker.timeLeftToLevel(0)).to.equal(days.mul(3));
+        });
+        it("nextLevelTime SUCCESS", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            await theoryUnlocker.mint(1);
+            expect(await theoryUnlocker.nextLevelTime(0)).to.equal(BigNumber.from(await latestBlocktime(ethers.provider)).add(days.mul(3)));
+        });
+        it("mint SUCCESS", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            let initialBalance = await iToken.balanceOf(await theoryUnlocker.communityFund());
+            expect(await theoryUnlocker.totalSupply()).to.equal(zero);
+            await theoryUnlocker.mint(5);
+            expect(await iToken.balanceOf(await theoryUnlocker.communityFund())).to.equal(initialBalance.add(oneHundred.add(oneHundred.mul(5).mul(4))));
+            expect(await theoryUnlocker.totalSupply()).to.equal(BigNumber.from(1));
+            let timestamp = await latestBlocktime(ethers.provider);
+            expect((await theoryUnlocker.tokenInfo(0)).creationTime).to.equal(timestamp);
+            expect((await theoryUnlocker.tokenInfo(0)).lastLevelTime).to.equal(timestamp);
+            expect((await theoryUnlocker.tokenInfo(0)).level).to.equal(BigNumber.from(1));
+            expect(await theoryUnlocker.tokenURI(0)).to.equal("bronze");
+        });
+        it("mint zero FAILURE", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            expect(theoryUnlocker.mint(0)).to.be.revertedWith('Level must be > 0 and <= max level.');
+        });
+        it("mint > max level FAILURE", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            expect(theoryUnlocker.mint(100)).to.be.revertedWith('Level must be > 0 and <= max level.');
+        });
+
+        it("merge SUCCESS", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            let initialBalance = await iToken.balanceOf(await theoryUnlocker.communityFund());
+            expect(await theoryUnlocker.totalSupply()).to.equal(zero);
+            await theoryUnlocker.mint(1);
+            expect(await theoryUnlocker.totalSupply()).to.equal(BigNumber.from(1));
+            await theoryUnlocker.mint(2);
+            expect(await theoryUnlocker.totalSupply()).to.equal(BigNumber.from(2));
+            await theoryUnlocker.merge(0,1);
+            expect(await theoryUnlocker.totalSupply()).to.equal(BigNumber.from(1));
+            let timestamp = await latestBlocktime(ethers.provider);
+            expect((await theoryUnlocker.tokenInfo(2)).creationTime).to.equal(timestamp);
+            expect((await theoryUnlocker.tokenInfo(2)).lastLevelTime).to.equal(timestamp);
+            expect((await theoryUnlocker.tokenInfo(2)).level).to.equal(BigNumber.from(3));
+            expect(await theoryUnlocker.tokenURI(2)).to.equal("bronze");
+        });
+        it("mint > max level FAILURE", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            await theoryUnlocker.mint(5);
+            await theoryUnlocker.mint(5);
+            expect(theoryUnlocker.merge(0,1)).to.be.revertedWith('Level must be > 0 and <= max level.');
+        });
     });
 });

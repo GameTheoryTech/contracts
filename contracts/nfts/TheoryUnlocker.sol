@@ -2,6 +2,7 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../AuthorizableNoOperator.sol";
@@ -11,8 +12,11 @@ pragma experimental ABIEncoderV2; //https://docs.soliditylang.org/en/v0.6.9/layo
 
 //When deploying: Every 15 days 5 max levels, max max level is 50. Initial price = 100, buy per level = 500.
 contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
+    using Counters for Counters.Counter;
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
+
+    Counters.Counter private _tokenIds;
 
     struct TokenInfo
     {
@@ -26,7 +30,7 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
     struct UserInfo
     {
         uint256 lastUnlockTime;
-        uint256 lastLockOf;
+        uint256 lastLockAmount;
     }
     mapping(address => UserInfo) public userInfo;
 
@@ -123,6 +127,7 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
 
     function setTokenLevel(uint256 tokenId, uint256 level) public onlyAuthorized
     {
+        require(level > 0 && level <= maxLevel(), "Level must be > 0 and <= max level.");
         tokenInfo[tokenId].level = level;
     }
 
@@ -141,9 +146,9 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         userInfo[user].lastUnlockTime = time;
     }
 
-    function setLastLockOf(address user, uint256 time) public onlyAuthorized
+    function setLastLockAmount(address user, uint256 amount) public onlyAuthorized
     {
-        userInfo[user].lastLockOf = time;
+        userInfo[user].lastLockAmount = amount;
     }
 
     //Data functions
@@ -207,8 +212,9 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         address player = msg.sender;
         uint256 amount = initialPrice.add(buyTokenPerLevel.mul(level.sub(1)));
         buyToken.safeTransferFrom(msg.sender, communityFund, amount);
+        _tokenIds.increment();
 
-        uint256 newItemId = totalSupply();
+        uint256 newItemId = _tokenIds.current();
         TokenInfo storage token = tokenInfo[newItemId];
         token.creationTime = block.timestamp;
         token.lastLevelTime = block.timestamp;
@@ -234,8 +240,9 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         _burn(tokenId2);
 
         //Mint a new one.
+        _tokenIds.increment();
 
-        uint256 newItemId = totalSupply();
+        uint256 newItemId = _tokenIds.current();
         TokenInfo storage token = tokenInfo[newItemId];
         token.creationTime = block.timestamp;
         token.lastLevelTime = block.timestamp;
@@ -280,7 +287,7 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         if(amountLocked == 0)
         {
             user.lastUnlockTime = block.timestamp;
-            user.lastLockOf = amountLocked; //Only update.
+            user.lastLockAmount = amountLocked; //Only update.
             return;
         }
 
@@ -288,15 +295,15 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         require(amountLocked > pendingLocked, "Too much to unlock naturally, please call unlock() first."); //Can't update, just revert.
 
         amountLocked = amountLocked.sub(pendingLocked); //Amount after unlocking naturally.
-        if(!(amountLocked > user.lastLockOf)) //Can't unlock in good faith.
+        if(!(amountLocked > user.lastLockAmount)) //Can't unlock in good faith.
         {
             theory.unlockForUser(player, 0); //Unlock the natural amount.
             user.lastUnlockTime = block.timestamp;
-            user.lastLockOf = theory.lockOf(player); //Update so that the player may unlock in the future.
+            user.lastLockAmount = theory.lockOf(player); //Update so that the player may unlock in the future.
             return;
         }
 
-        amountLocked = amountLocked.sub(user.lastLockOf); //Amount after taking into account amount already unlocked.
+        amountLocked = amountLocked.sub(user.lastLockAmount); //Amount after taking into account amount already unlocked.
 
         //Amount to unlock = Level% of locked amount calculated above
         uint256 amountToUnlock = amountLocked.mul(tokenInfo[tokenId].level).div(100);
@@ -304,6 +311,6 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         theory.unlockForUser(player, amountToUnlock);
 
         user.lastUnlockTime = block.timestamp;
-        user.lastLockOf = theory.lockOf(player); //Set to lock amount AFTER unlock. Can only unlock any more locked will be used.
+        user.lastLockAmount = theory.lockOf(player); //Set to lock amount AFTER unlock. Can only unlock any more locked will be used.
     }
 }
