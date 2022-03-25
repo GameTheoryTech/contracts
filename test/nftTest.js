@@ -181,5 +181,62 @@ describe('nftTests', function () {
             expect(await theoryUnlocker.timeToLevel()).to.equal(days.mul(3));
             expect(await theoryUnlocker.theory()).to.equal(sToken.address);
         });
+        it("constructor levelURI zero length FAILURE", async () => {
+            const TheoryUnlocker = await smock.mock("TheoryUnlocker");
+            await expect(TheoryUnlocker.deploy(iToken.address, oneHundred, oneHundred.mul(5), sToken.address, daofund.address,
+                [zero, startTime.add(days.mul(15)), startTime.add(days.mul(15).mul(2)), startTime.add(days.mul(15).mul(3)), startTime.add(days.mul(15).mul(4)), startTime.add(days.mul(15).mul(5)), startTime.add(days.mul(15).mul(6)), startTime.add(days.mul(15).mul(7)), startTime.add(days.mul(15).mul(8)), startTime.add(days.mul(15).mul(9))],
+                [BigNumber.from(5),BigNumber.from(10),BigNumber.from(15),BigNumber.from(20),BigNumber.from(25),BigNumber.from(30),BigNumber.from(35),BigNumber.from(40),BigNumber.from(45),BigNumber.from(50)],
+                [], [])).to.be.revertedWith("Level URI arrays must be equal in non-zero length and level should start at 0.");
+        });
+        it("constructor levelURI not zero FAILURE", async () => {
+            const TheoryUnlocker = await smock.mock("TheoryUnlocker");
+            await expect(TheoryUnlocker.deploy(iToken.address, oneHundred, oneHundred.mul(5), sToken.address, daofund.address,
+                [zero, startTime.add(days.mul(15)), startTime.add(days.mul(15).mul(2)), startTime.add(days.mul(15).mul(3)), startTime.add(days.mul(15).mul(4)), startTime.add(days.mul(15).mul(5)), startTime.add(days.mul(15).mul(6)), startTime.add(days.mul(15).mul(7)), startTime.add(days.mul(15).mul(8)), startTime.add(days.mul(15).mul(9))],
+                [BigNumber.from(5),BigNumber.from(10),BigNumber.from(15),BigNumber.from(20),BigNumber.from(25),BigNumber.from(30),BigNumber.from(35),BigNumber.from(40),BigNumber.from(45),BigNumber.from(50)],
+                [one,BigNumber.from(20),BigNumber.from(40),BigNumber.from(50)], ["bronze","silver","gold","platinum"])).to.be.revertedWith("Level URI arrays must be equal in non-zero length and level should start at 0.");
+        });
+        it("constructor levelURI not equal length FAILURE", async () => {
+            const TheoryUnlocker = await smock.mock("TheoryUnlocker");
+            await expect(TheoryUnlocker.deploy(iToken.address, oneHundred, oneHundred.mul(5), sToken.address, daofund.address,
+                [zero, startTime.add(days.mul(15)), startTime.add(days.mul(15).mul(2)), startTime.add(days.mul(15).mul(3)), startTime.add(days.mul(15).mul(4)), startTime.add(days.mul(15).mul(5)), startTime.add(days.mul(15).mul(6)), startTime.add(days.mul(15).mul(7)), startTime.add(days.mul(15).mul(8)), startTime.add(days.mul(15).mul(9))],
+                [BigNumber.from(5),BigNumber.from(10),BigNumber.from(15),BigNumber.from(20),BigNumber.from(25),BigNumber.from(30),BigNumber.from(35),BigNumber.from(40),BigNumber.from(45),BigNumber.from(50)],
+                [zero,BigNumber.from(20),BigNumber.from(40),BigNumber.from(50)], ["silver","gold","platinum"])).to.be.revertedWith("Level URI arrays must be equal in non-zero length and level should start at 0.");
+        });
+        it("constructor maxLevel zero length FAILURE", async () => {
+            const TheoryUnlocker = await smock.mock("TheoryUnlocker");
+            await expect(TheoryUnlocker.deploy(iToken.address, oneHundred, oneHundred.mul(5), sToken.address, daofund.address,
+                [],
+                [],
+                [zero,BigNumber.from(20),BigNumber.from(40),BigNumber.from(50)], ["bronze","silver","gold","platinum"])).to.be.revertedWith("Max level arrays must be equal in non-zero length and time should start at 0.");
+        });
+        it("constructor maxLevel not zero FAILURE", async () => {
+            const TheoryUnlocker = await smock.mock("TheoryUnlocker");
+            await expect(TheoryUnlocker.deploy(iToken.address, oneHundred, oneHundred.mul(5), sToken.address, daofund.address,
+                [one, startTime.add(days.mul(15)), startTime.add(days.mul(15).mul(2)), startTime.add(days.mul(15).mul(3)), startTime.add(days.mul(15).mul(4)), startTime.add(days.mul(15).mul(5)), startTime.add(days.mul(15).mul(6)), startTime.add(days.mul(15).mul(7)), startTime.add(days.mul(15).mul(8)), startTime.add(days.mul(15).mul(9))],
+                [BigNumber.from(5),BigNumber.from(10),BigNumber.from(15),BigNumber.from(20),BigNumber.from(25),BigNumber.from(30),BigNumber.from(35),BigNumber.from(40),BigNumber.from(45),BigNumber.from(50)],
+                [zero,BigNumber.from(20),BigNumber.from(40),BigNumber.from(50)], ["bronze","silver","gold","platinum"])).to.be.revertedWith("Max level arrays must be equal in non-zero length and time should start at 0.");
+        });
+        it("constructor maxLevel not equal length FAILURE", async () => {
+            const TheoryUnlocker = await smock.mock("TheoryUnlocker");
+            await expect(TheoryUnlocker.deploy(iToken.address, oneHundred, oneHundred.mul(5), sToken.address, daofund.address,
+                [zero, startTime.add(days.mul(15)), startTime.add(days.mul(15).mul(2)), startTime.add(days.mul(15).mul(3)), startTime.add(days.mul(15).mul(4)), startTime.add(days.mul(15).mul(5)), startTime.add(days.mul(15).mul(6)), startTime.add(days.mul(15).mul(7)), startTime.add(days.mul(15).mul(8)), startTime.add(days.mul(15).mul(9))],
+                [BigNumber.from(5),BigNumber.from(15),BigNumber.from(20),BigNumber.from(25),BigNumber.from(30),BigNumber.from(35),BigNumber.from(40),BigNumber.from(45),BigNumber.from(50)],
+                [zero,BigNumber.from(20),BigNumber.from(40),BigNumber.from(50)], ["bronze","silver","gold","platinum"])).to.be.revertedWith("Max level arrays must be equal in non-zero length and time should start at 0.");
+        });
+        it("constructor maxLevel > 100 FAILURE", async () => {
+            const TheoryUnlocker = await smock.mock("TheoryUnlocker");
+            await expect(TheoryUnlocker.deploy(iToken.address, oneHundred, oneHundred.mul(5), sToken.address, daofund.address,
+                [zero, startTime.add(days.mul(15)), startTime.add(days.mul(15).mul(2)), startTime.add(days.mul(15).mul(3)), startTime.add(days.mul(15).mul(4)), startTime.add(days.mul(15).mul(5)), startTime.add(days.mul(15).mul(6)), startTime.add(days.mul(15).mul(7)), startTime.add(days.mul(15).mul(8)), startTime.add(days.mul(15).mul(9))],
+                [BigNumber.from(5),BigNumber.from(10),BigNumber.from(110),BigNumber.from(20),BigNumber.from(25),BigNumber.from(30),BigNumber.from(35),BigNumber.from(40),BigNumber.from(45),BigNumber.from(50)],
+                [zero,BigNumber.from(20),BigNumber.from(40),BigNumber.from(50)], ["bronze","silver","gold","platinum"])).to.be.revertedWith("Max level can't be higher than 100.");
+        });
+        it("setBuyToken SUCCESS", async () => {
+            await theoryUnlocker.setBuyToken(sToken.address);
+            expect(await theoryUnlocker.buyToken()).to.equal(sToken.address);
+        });
+        it("setBuyToken not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setBuyToken(sToken.address)).to.be.revertedWith('caller is not authorized');
+        });
     });
 });
