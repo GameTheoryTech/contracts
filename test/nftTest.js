@@ -481,6 +481,7 @@ describe('nftTests', function () {
         });
 
         it("levelUp SUCCESS", async () => {
+            await theoryUnlocker.renounceOwnership();
             await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
             await advanceTime(ethers.provider, years.toNumber());
             await theoryUnlocker.mint(19);
@@ -513,21 +514,82 @@ describe('nftTests', function () {
             await theoryUnlocker.mint(1);
             await expect(theoryUnlocker.levelUp(1)).to.be.revertedWith('Too early to level up.');
         });
-        it("nftUnlock SUCCESS", async () => {
+        it("nftUnlock part 1 SUCCESS", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            await theoryUnlocker.mint(1);
+            let lockAmount = one.mul(10).div(100);
+            await sToken.lock(deployer.address, lockAmount);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount);
+            await theoryUnlocker.nftUnlock(1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount.sub(lockAmount.div(100)));
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(lockAmount.sub(lockAmount.div(100)));
+            //Test twice
+            await theoryUnlocker.nftUnlock(1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount.sub(lockAmount.div(100)));
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(lockAmount.sub(lockAmount.div(100)));
+
+            let extraLock = one.mul(10).div(100);
+            await sToken.lock(deployer.address, extraLock);
+            let oldLock = lockAmount.sub(lockAmount.div(100));
+            lockAmount = oldLock.add(extraLock);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount);
+            expect(await theoryUnlocker.canUnlockAmount(deployer.address, 1)).to.equal(extraLock.div(100));
+            await theoryUnlocker.nftUnlock(1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount.sub(extraLock.div(100)));
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(lockAmount.sub(extraLock.div(100)));
+            await theoryUnlocker.renounceOwnership();
+            await theoryUnlocker.nftUnlock(1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount.sub(extraLock.div(100)));
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(lockAmount.sub(extraLock.div(100)));
+        });
+        it("nftUnlock part 2 SUCCESS", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            await theoryUnlocker.mint(1);
+            let lockAmount = one.mul(10).div(100);
+            await sToken.lock(deployer.address, lockAmount);
+            await theoryUnlocker.setLastLockAmount(deployer.address, lockAmount.add(one));
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount);
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(lockAmount.add(one));
+            await theoryUnlocker.nftUnlock(1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount);
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(lockAmount);
+
+            //More locked
+            let extraLock = one.mul(10).div(100);
+            await sToken.lock(deployer.address, extraLock);
+            let oldLock = lockAmount;
+            lockAmount = oldLock.add(extraLock);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount);
+            await theoryUnlocker.nftUnlock(1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount.sub(extraLock.div(100)));
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(lockAmount.sub(extraLock.div(100)));
+        });
+        it("nftUnlock amountLocked == 0 SUCCESS", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            await theoryUnlocker.mint(1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(zero);
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(zero);
+            await theoryUnlocker.nftUnlock(1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(zero);
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(zero);
+        });
+        it("nftUnlock too much to unlock naturally FAILURE", async () => {
             await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
             await theoryUnlocker.mint(1);
             let lockAmount = one.mul(95).div(100);
             await sToken.lock(deployer.address, lockAmount);
             expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount);
-            await theoryUnlocker.nftUnlock(1);
-            expect(await sToken.lockOf(deployer.address)).to.equal(lockAmount.sub(lockAmount.div(100)));
-            //TODO: Test twice
-            //TODO: Test after year
-            //TODO: Test after 1.5 years
-            //TODO: Test after 1.5 years + an unlock
-            //TODO: Test after 1.5 years + an unlock + a relock
-            //TODO: Test after 2 years
-            //TODO: Test failure
+            await advanceTime(ethers.provider, years.mul(2).toNumber());
+            await expect(theoryUnlocker.nftUnlock(1)).to.be.revertedWith('Too much to unlock naturally, please call unlock() first.');
+        });
+        it("nftUnlock not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            await theoryUnlocker.mint(1);
+            await theoryUnlocker.transferFrom(deployer.address, daofund.address, 1);
+            expect(await sToken.lockOf(deployer.address)).to.equal(zero);
+            expect((await theoryUnlocker.userInfo(deployer.address)).lastLockAmount).to.equal(zero);
+            await expect(theoryUnlocker.nftUnlock(1)).to.be.revertedWith('Not enough permissions.');
         });
     });
 });

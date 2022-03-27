@@ -206,6 +206,37 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         return tokenInfo[tokenId].lastLevelTime.add(timeToLevel);
     }
 
+    //This or theory.canUnlockAmount > 0? Enable button.
+    function canUnlockAmount(address player, uint256 tokenId) external view returns (uint256)
+    {
+        UserInfo memory user = userInfo[player];
+
+        uint256 amountLocked = theory.lockOf(player);
+        if(amountLocked == 0)
+        {
+            return 0;
+        }
+
+        uint256 pendingUnlock = theory.canUnlockAmount(player);
+        if(!(amountLocked > pendingUnlock))
+        {
+            return 0;
+        }
+
+        amountLocked = amountLocked.sub(pendingUnlock); //Amount after unlocking naturally.
+        if(!(amountLocked > user.lastLockAmount)) //Can't unlock in good faith.
+        {
+            return 0;
+        }
+
+        amountLocked = amountLocked.sub(user.lastLockAmount); //Amount after taking into account amount already unlocked.
+
+        //Amount to unlock = Level% of locked amount calculated above
+        uint256 amountToUnlock = amountLocked.mul(tokenInfo[tokenId].level).div(100);
+
+        return amountToUnlock;
+    }
+
     //Core functionality
     function mint(uint256 level) onlyOneBlock public returns (uint256) {
         require(level > 0 && level <= maxLevel(), "Level must be > 0 and <= max level.");
@@ -291,11 +322,11 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
             return;
         }
 
-        uint256 pendingLocked = theory.canUnlockAmount(player);
-        require(amountLocked > pendingLocked, "Too much to unlock naturally, please call unlock() first."); //Can't update, just revert.
+        uint256 pendingUnlock = theory.canUnlockAmount(player);
+        require(amountLocked > pendingUnlock, "Too much to unlock naturally, please call unlock() first."); //Can't update, just revert.
 
-        amountLocked = amountLocked.sub(pendingLocked); //Amount after unlocking naturally.
-        if(!(amountLocked > user.lastLockAmount)) //Can't unlock in good faith.
+        amountLocked = amountLocked.sub(pendingUnlock); //Amount after unlocking naturally.
+        if(!(amountLocked > user.lastLockAmount)) //Can't unlock in good faith. Only time this would happen (currently), the lock rate is 0 anyways.
         {
             theory.unlockForUser(player, 0); //Unlock the natural amount.
             user.lastUnlockTime = block.timestamp;
