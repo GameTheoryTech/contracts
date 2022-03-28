@@ -44,9 +44,10 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
     address public communityFund;
     uint256 public timeToLevel;
     IERC20Lockable public theory;
+    bool public disableMint; // Limited time only?! Would give more worth in marketplace the for our early investors.
 
     //Construction
-    constructor(IERC20 _buy, uint256 _initialBuy, uint256 _buyPerLevel, IERC20Lockable _theory, address _communityFund, uint256[] memory _maxLevelTime, uint256[] memory _maxLevelLevel, uint256[] memory _levelURIsLevel, string[] memory _levelURIsURI) ERC721("THEORY Unlocker", "GU") public {
+    constructor(IERC20 _buy, uint256 _initialBuy, uint256 _buyPerLevel, IERC20Lockable _theory, address _communityFund, uint256[] memory _maxLevelTime, uint256[] memory _maxLevelLevel, uint256[] memory _levelURIsLevel, string[] memory _levelURIsURI) ERC721("THEORY Unlocker", "TU") public {
         buyToken = _buy;
         initialPrice = _initialBuy;
         buyTokenPerLevel = _buyPerLevel;
@@ -71,6 +72,7 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         communityFund = _communityFund;
         timeToLevel = 3 days;
         theory = _theory;
+        disableMint = false;
     }
 
     //Administrative functions
@@ -123,6 +125,11 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
     function setTimeToLevel(uint256 _time) public onlyAuthorized
     {
         timeToLevel = _time;
+    }
+
+    function setDisableMint(bool _disable) public onlyAuthorized
+    {
+        disableMint = _disable;
     }
 
     function setTokenLevel(uint256 tokenId, uint256 level) public onlyAuthorized
@@ -239,6 +246,7 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
 
     //Core functionality
     function mint(uint256 level) onlyOneBlock public returns (uint256) {
+        require(!disableMint, "You can no longer mint this NFT.");
         require(level > 0 && level <= maxLevel(), "Level must be > 0 and <= max level.");
         address player = msg.sender;
         uint256 amount = initialPrice.add(buyTokenPerLevel.mul(level.sub(1)));
@@ -266,6 +274,7 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         uint256 level = tokenInfo[tokenId1].level.add(tokenInfo[tokenId2].level); //Add the two levels together.
         require(level > 0 && level <= maxLevel(), "Level must be > 0 and <= max level.");
         address player = ownerOf(tokenId1);
+        string memory tokenURI = tokenURI(tokenId1); //Takes the URI of the FIRST token. Make sure to warn users of this.
         //Burn originals.
         _burn(tokenId1);
         _burn(tokenId2);
@@ -279,7 +288,6 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         token.lastLevelTime = block.timestamp;
         _mint(player, newItemId);
         token.level = level;
-        string memory tokenURI = levelURI(level);
         require(bytes(tokenURI).length > 0, "Token URI is invalid.");
         _setTokenURI(newItemId, tokenURI);
 
@@ -299,9 +307,9 @@ contract TheoryUnlocker is ERC721, AuthorizableNoOperator, ContractGuard {
         //_mint(player, newItemId); //Same ID.
         uint256 level = token.level.add(1);
         token.level = level;
-        string memory tokenURI = levelURI(level);
-        require(bytes(tokenURI).length > 0, "Token URI is invalid.");
-        _setTokenURI(tokenId, tokenURI);
+        //string memory tokenURI = levelURI(level);
+        //require(bytes(tokenURI).length > 0, "Token URI is invalid.");
+        //_setTokenURI(tokenId, tokenURI);
     }
 
     //Should be called:

@@ -310,6 +310,14 @@ describe('nftTests', function () {
             await theoryUnlocker.renounceOwnership();
             await expect(theoryUnlocker.setTimeToLevel(hours)).to.be.revertedWith('caller is not authorized');
         });
+        it("setDisableMint SUCCESS", async () => {
+            await theoryUnlocker.setDisableMint(true);
+            expect(await theoryUnlocker.disableMint()).to.equal(true);
+        });
+        it("setDisableMint not authorized FAILURE", async () => {
+            await theoryUnlocker.renounceOwnership();
+            await expect(theoryUnlocker.setDisableMint(true)).to.be.revertedWith('caller is not authorized');
+        });
         it("setTokenLevel SUCCESS", async () => {
             await theoryUnlocker.setTokenLevel(BigNumber.from(1), BigNumber.from(5));
             expect((await theoryUnlocker.tokenInfo(BigNumber.from(1))).level).to.equal(BigNumber.from(5));
@@ -433,6 +441,11 @@ describe('nftTests', function () {
             expect((await theoryUnlocker.tokenInfo(1)).level).to.equal(BigNumber.from(5));
             expect(await theoryUnlocker.tokenURI(1)).to.equal("bronze");
         });
+        it("mint disabled FAILURE", async () => {
+            await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            await theoryUnlocker.setDisableMint(true);
+            await expect(theoryUnlocker.mint(1)).to.be.revertedWith('You can no longer mint this NFT.');
+        });
         it("mint zero FAILURE", async () => {
             await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
             await expect(theoryUnlocker.mint(0)).to.be.revertedWith('Level must be > 0 and <= max level.');
@@ -493,7 +506,8 @@ describe('nftTests', function () {
             expect((await theoryUnlocker.tokenInfo(1)).creationTime).to.equal(timestamp1);
             expect((await theoryUnlocker.tokenInfo(1)).lastLevelTime).to.equal(timestamp2);
             expect((await theoryUnlocker.tokenInfo(1)).level).to.equal(BigNumber.from(20));
-            expect(await theoryUnlocker.tokenURI(1)).to.equal("silver");
+            //expect(await theoryUnlocker.tokenURI(1)).to.equal("silver");
+            expect(await theoryUnlocker.tokenURI(1)).to.equal("bronze");
         });
         it("levelUp invalid permissions FAILURE", async () => {
             await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
@@ -512,6 +526,12 @@ describe('nftTests', function () {
         it("levelUp too early FAILURE", async () => {
             await iToken.approve(theoryUnlocker.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
             await theoryUnlocker.mint(1);
+            await expect(theoryUnlocker.levelUp(1)).to.be.revertedWith('Too early to level up.');
+            await advanceTime(ethers.provider, days.mul(6).toNumber());
+            await theoryUnlocker.levelUp(1);
+            expect((await theoryUnlocker.tokenInfo(1)).level).to.equal(BigNumber.from(2));
+            await theoryUnlocker.levelUp(1)
+            expect((await theoryUnlocker.tokenInfo(1)).level).to.equal(BigNumber.from(3));
             await expect(theoryUnlocker.levelUp(1)).to.be.revertedWith('Too early to level up.');
         });
         it("nftUnlock part 1 SUCCESS", async () => {
