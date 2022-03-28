@@ -13,6 +13,7 @@
     "deployNftsTest": "hardhat run --network fantomtest scripts/deployNftsTest.js",
     "addPoolsTest": "hardhat run --network fantomtest scripts/addPoolsTest.js",
     "verify": "hardhat run --network fantom scripts/verify.js",
+    "verifyNfts": "hardhat run --network fantom scripts/verifyNfts.js",
     "flatten": "hardhat flatten contracts/distribution/TheoryRewardPool.sol > TheoryRewardPoolFlattened.sol",
     "allocateSeigniorage": "hardhat run --network fantom scripts/allocateSeigniorageBot.js",
     "discord": "hardhat run --network fantom scripts/discordBot.js"
