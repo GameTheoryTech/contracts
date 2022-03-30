@@ -6,13 +6,14 @@ const {BigNumber} = require("@ethersproject/bignumber");
 async function run(delay) {
     const [deployer, daofund, devfund] = await hre.ethers.getSigners();
 
-    const treasuryDAO = (await hre.ethers.getContractAt("Treasury", "0x98F5cdda1489503e755Da30BEc5FCD341C949791")).connect(daofund);
+    const theoryUnlocker = (await hre.ethers.getContractAt("TheoryUnlocker", "0x9d30Aa92b2C128850EE0336D5bEAE3AcD3A52c9c"));
     try
     {
         //Lazy
-        const shouldAllocate = await treasuryDAO.shouldAllocateSeigniorage();
-        if(shouldAllocate) {
-            await treasuryDAO.allocateSeigniorage();
+        const totalSupply = await theoryUnlocker.totalSupply();
+        if(totalSupply.gte(100)) {
+            await theoryUnlocker.setDisableMint(true);
+            return;
         }
     }
     catch(e)
@@ -21,4 +22,4 @@ async function run(delay) {
     }
     setTimeout(() => run(delay), delay);
 }
-run(60000).catch(r => run(60000)).then(r => {});
+run(1000).catch(r => run(1000)).then(r => {});
