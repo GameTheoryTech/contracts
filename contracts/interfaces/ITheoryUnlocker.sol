@@ -1,0 +1,67 @@
+pragma experimental ABIEncoderV2;
+interface ITheoryUnlocker {
+  struct UserInfo
+  {
+    uint256 lastUnlockTime;
+    uint256 lastLockAmount;
+  }
+  function addAuthorized ( address _toAdd ) external;
+  function approve ( address to, uint256 tokenId ) external;
+  function authorized ( address ) external view returns ( bool );
+  function balanceOf ( address owner ) external view returns ( uint256 );
+  function baseURI (  ) external view returns ( string memory );
+  function buyToken (  ) external view returns ( address );
+  function buyTokenPerLevel (  ) external view returns ( uint256 );
+  function canUnlockAmount ( address player, uint256 tokenId ) external view returns ( uint256 );
+  function communityFund (  ) external view returns ( address );
+  function costOf ( uint256 level ) external view returns ( uint256 );
+  function disableMint (  ) external view returns ( bool );
+  function getApproved ( uint256 tokenId ) external view returns ( address );
+  function initialPrice (  ) external view returns ( uint256 );
+  function isApprovedForAll ( address owner, address operator ) external view returns ( bool );
+  function levelURI ( uint256 level ) external view returns ( string memory );
+  function levelURIsLevel ( uint256 ) external view returns ( uint256 );
+  function levelURIsURI ( uint256 ) external view returns ( string memory );
+  function levelUp ( uint256 tokenId ) external;
+  function maxLevel (  ) external view returns ( uint256 );
+  function maxLevelLevel ( uint256 ) external view returns ( uint256 );
+  function maxLevelTime ( uint256 ) external view returns ( uint256 );
+  function merge ( uint256 tokenId1, uint256 tokenId2 ) external returns ( uint256 );
+  function mint ( uint256 level ) external returns ( uint256 );
+  function name (  ) external view returns ( string memory );
+  function nextLevelTime ( uint256 tokenId ) external view returns ( uint256 );
+  function nftUnlock ( uint256 tokenId ) external;
+  function owner (  ) external view returns ( address );
+  function ownerOf ( uint256 tokenId ) external view returns ( address );
+  function removeAuthorized ( address _toRemove ) external;
+  function renounceOwnership (  ) external;
+  function safeTransferFrom ( address from, address to, uint256 tokenId ) external;
+  function safeTransferFrom ( address from, address to, uint256 tokenId, bytes memory _data ) external;
+  function setApprovalForAll ( address operator, bool approved ) external;
+  function setBuyToken ( address _buy ) external;
+  function setBuyTokenPerLevel ( uint256 _perLevel ) external;
+  function setCommunityFund ( address _fund ) external;
+  function setCreationTime ( uint256 tokenId, uint256 time ) external;
+  function setDisableMint ( bool _disable ) external;
+  function setInitialPrice ( uint256 _initial ) external;
+  function setLastLevelTime ( uint256 tokenId, uint256 time ) external;
+  function setLastLockAmount ( address user, uint256 amount ) external;
+  function setLastUnlockTime ( address user, uint256 time ) external;
+  function setLevelURIs ( uint256[] memory _levelURIsLevel, string[] memory _levelURIsURI ) external;
+  function setMaxLevel ( uint256[] memory _maxLevelTime, uint256[] memory _maxLevelLevel ) external;
+  function setTimeToLevel ( uint256 _time ) external;
+  function setTokenLevel ( uint256 tokenId, uint256 level ) external;
+  function supportsInterface ( bytes4 interfaceId ) external view returns ( bool );
+  function symbol (  ) external view returns ( string memory );
+  function theory (  ) external view returns ( address );
+  function timeLeftToLevel ( uint256 tokenId ) external view returns ( uint256 );
+  function timeToLevel (  ) external view returns ( uint256 );
+  function tokenByIndex ( uint256 index ) external view returns ( uint256 );
+  function tokenInfo ( uint256 ) external view returns ( uint256 level, uint256 creationTime, uint256 lastLevelTime );
+  function tokenOfOwnerByIndex ( address owner, uint256 index ) external view returns ( uint256 );
+  function tokenURI ( uint256 tokenId ) external view returns ( string memory );
+  function totalSupply (  ) external view returns ( uint256 );
+  function transferFrom ( address from, address to, uint256 tokenId ) external;
+  function transferOwnership ( address newOwner ) external;
+  function userInfo ( address ) external view returns ( UserInfo memory );
+}

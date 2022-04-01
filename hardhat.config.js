@@ -3,6 +3,7 @@ require("@nomiclabs/hardhat-etherscan")
 require("dotenv").config()
 require("hardhat-abi-exporter");
 require("@nomiclabs/hardhat-etherscan");
+require("hardhat-interface-generator");
 
 module.exports = {
     networks: {
