@@ -12,4 +12,5 @@ interface IERC20Lockable is IERC20 {
     function lockOf(address account) external view returns (uint256);
     function canUnlockAmount(address account) external view returns (uint256);
     function unlockForUser(address account, uint256 amount) external;
+    function burn(uint256 amount) external;
 }

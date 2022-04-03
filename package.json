@@ -42,7 +42,8 @@
     "hardhat": "^2.8.2",
     "hardhat-abi-exporter": "^2.8.0",
     "hardhat-etherscan": "^1.0.1",
-    "hardhat-interface-generator": "^0.0.6"
+    "hardhat-interface-generator": "^0.0.6",
+    "solidity-coverage": "^0.7.20"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
