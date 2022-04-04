@@ -53,8 +53,8 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
     IERC20Lockable public game;
     bool public disableMint; // Limited time only?! Would give more worth in marketplace the for our early investors.
     bool public emergencyDisableUnlock; // EMERGENCY ONLY.
-    ITheoryUnlocker TheoryUnlockerGen0;
-    IUniswapV2Router router;
+    ITheoryUnlocker public TheoryUnlockerGen0;
+    IUniswapV2Router public router;
 
     uint256 public gameCostPerLevel;
     uint256[] public extraGameCostLevel; // Used like feeStageTime. Starting level, not the level to level up to.
@@ -69,7 +69,7 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
     //Construction
     constructor(IERC20 _buy, uint256[2] memory _prices, IERC20Lockable[2] memory _theoryAndGame, address _communityFund, ITheoryUnlocker _gen0, IUniswapV2Router _router, uint256[] memory _maxLevelTime, uint256[] memory _maxLevelLevel, uint256[] memory _levelURIsLevel, string[] memory _levelURIsURI, uint256[] memory _levelURIsMax) ERC721("THEORY Unlocker Gen 1", "TUG1") public {
         buyToken = _buy;
-        require(_prices[0] >= _prices[1], "Initial price must be lower than buy per level.");
+        require(_prices[0] >= _prices[1], "IP"); //Initial price must be >= buy per level.
         initialPrice = _prices[0];
         buyTokenPerLevel = _prices[1];
         require(_levelURIsLevel.length > 0
@@ -110,9 +110,9 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         burnPercentage = 1000;
         router = _router;
 
-        gameCostPerLevel = 1;
+        gameCostPerLevel = 1 ether;
         extraGameCostLevel = [0,5,10,15,20,25,30,35,40,45];
-        extraGameCostAmount = [0,5,10,15,20,25,30,35,40,45];
+        extraGameCostAmount = [5 ether,10 ether,20 ether,40 ether,80 ether,160 ether,320 ether,640 ether,1280 ether,2560 ether];
     }
 
     //Administrative functions
@@ -123,7 +123,7 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
 
     function setBurnPercentage(uint256 _burn) public onlyAuthorized
     {
-        require(_burn <= 10000, "Burn amount must be <= 100%.");
+        require(_burn <= 10000, "BA"); //Burn amount must be <= 100%
         burnPercentage = _burn;
     }
 
@@ -134,7 +134,7 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
 
     function setPrices(uint256 _initial, uint256 _perLevel) public onlyAuthorized
     {
-        require(_initial >= _perLevel, "Initial price must be lower than buy per level.");
+        require(_initial >= _perLevel, "IP"); //Initial price must be >= buy per level.
         initialPrice = _initial;
         buyTokenPerLevel = _perLevel;
     }
@@ -143,6 +143,7 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
     //_levelURIsURI must be unique, or it will mess with removeSupply. It's just for stats, though, so it's not too harmful.
     function setLevelURIs(uint256[] memory _levelURIsLevel, string[] memory _levelURIsURI, uint256[] memory _levelURIsMax, uint256[] memory _levelURIsSupply, uint256[] memory _levelURIsMinted) public onlyAuthorized
     {
+        require(disableMint, "DMURI"); //For safety reasons, please disable mint before changing these values.
         require(_levelURIsLevel.length > 0
         && _levelURIsLevel[0] == 0
             && _levelURIsURI.length == _levelURIsLevel.length
@@ -178,14 +179,14 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         require(_extraGameCostLevel.length > 0
         && _extraGameCostLevel[0] == 0
             && _extraGameCostAmount.length == _extraGameCostLevel.length,
-            "Game cost arrays must be equal in non-zero length and time should start at 0.");
-        require(_gameCostPerLevel <= 10, "Game cost per level can't be higher than 10");
-        uint256 i;
-        uint256 len = _extraGameCostAmount.length;
-        for(i = 0; i < len; i += 1)
-        {
-            require(_extraGameCostAmount[i] <= 100, "Extra game cost can't be higher than 100.");
-        }
+            "GCA");
+        //require(_gameCostPerLevel <= 10, "Game cost per level can't be higher than 10"); //We actually may need higher than this limit, and not sure of the highest we need, deleting.
+//        uint256 i;
+//        uint256 len = _extraGameCostAmount.length;
+//        for(i = 0; i < len; i += 1)
+//        {
+//            require(_extraGameCostAmount[i] <= 100, "Extra game cost can't be higher than 100.");  //We actually may need higher than this limit, and not sure of the highest we need, deleting.
+//        }
         gameCostPerLevel = _gameCostPerLevel;
         extraGameCostLevel = _extraGameCostLevel;
         extraGameCostAmount = _extraGameCostAmount;
@@ -454,8 +455,8 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
     }
 
     function mint(uint256 level, uint256 slippage) onlyOneBlock public returns (uint256) {
-        require(!disableMint && !isAlwaysAuthorizedToMint(msg.sender), "You can no longer mint this NFT.");
-        require(level > 0 && level <= maxLevel() && !isAlwaysAuthorizedToMint(msg.sender), "Level must be > 0 and <= max level.");
+        require(!disableMint || isAlwaysAuthorizedToMint(msg.sender), "Minting has been disabled.");
+        require(level > 0 && level <= maxLevel() || level > 0 && isAlwaysAuthorizedToMint(msg.sender), "Level must be > 0 and <= max level.");
         if(!isAlwaysAuthorizedToMint(msg.sender))
         {
             uint256 totalAmount = initialPrice.add(buyTokenPerLevel.mul(level.sub(1)));
@@ -474,6 +475,8 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
                 amountOutMin = amountOut.sub(amountOut.mul(slippage).div(10000));
             }
             {
+                buyToken.safeApprove(address(router), 0);
+                buyToken.safeApprove(address(router), amountForGame);
                 uint256[] memory amountsObtained = router.swapExactTokensForTokens(amountForGame, amountOutMin, path, address(this), block.timestamp);
                 uint256 gameObtained = amountsObtained[amountsObtained.length - 1];
                 game.burn(gameObtained);
@@ -506,12 +509,12 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         require(ownerOf(tokenId1) == msg.sender || authorized[msg.sender] || owner() == msg.sender, "Not enough permissions for token 1.");
         require(ownerOf(tokenId2) == msg.sender || authorized[msg.sender] || owner() == msg.sender, "Not enough permissions for token 2.");
         require(ownerOf(tokenId1) == ownerOf(tokenId2), "Both tokens must have the same owner.");
-        require(!tokenInfo[tokenId1].merged, "Token 1 has already been merged. Gen 1 NFTs can only be merged once.");
-        require(!tokenInfo[tokenId2].merged, "Token 2 has already been merged. Gen 1 NFTs can only be merged once.");
+        require(!tokenInfo[tokenId1].merged, "Token 1 has already been merged."); // Gen 1 NFTs can only be merged once.
+        require(!tokenInfo[tokenId2].merged, "Token 2 has already been merged."); // Gen 1 NFTs can only be merged once.
         uint256 levelFirst = tokenInfo[tokenId1].level;
         uint256 levelSecond = tokenInfo[tokenId2].level;
         uint256 level = levelFirst.add(levelSecond); //Add the two levels together.
-        require(level > 0 && level <= maxLevel(), "Level must be > 0 and <= max level.");
+        require(level > 0 && level <= maxLevel() || isAlwaysAuthorizedToMint(msg.sender), "Level must be > 0 and <= max level.");
         address player = ownerOf(tokenId1);
         string memory _tokenURI = tokenURI(tokenId1); //Takes the URI of the FIRST token. Make sure to warn users of this.
         //Burn originals.
@@ -548,11 +551,14 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         //creationTime[newItemId] = block.timestamp; //Same creation time.
         token.lastLevelTime = nextLevelTime;
         //_mint(player, newItemId); //Same ID.
-        uint256 baseCost = gameCostPerLevel.mul(token.level);
-        uint256 extraCost = extraGameCost(token.level);
-        uint256 amount = baseCost.add(extraCost);
-        game.safeTransferFrom(msg.sender, address(this), amount);
-        game.burn(amount);
+        if(!isAlwaysAuthorizedToMint(msg.sender))
+        {
+            uint256 baseCost = gameCostPerLevel.mul(token.level);
+            uint256 extraCost = extraGameCost(token.level);
+            uint256 amount = baseCost.add(extraCost);
+            game.safeTransferFrom(msg.sender, address(this), amount);
+            game.burn(amount);
+        }
         uint256 level = token.level.add(1);
         token.level = level;
         //string memory tokenURI = levelURI(level);
@@ -566,7 +572,7 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
     }
 
     function levelUpTo(uint256 tokenId, uint256 theLevel) onlyOneBlock public {
-        require(theLevel > tokenInfo[tokenId].level && theLevel <= maxLevel(), "Level must be lower than max level and higher than current.");
+        require(theLevel > tokenInfo[tokenId].level && theLevel <= maxLevel(), "Level must be lower than max level and higher than current."); //Not going to bother with admin here.
         require(block.timestamp >= tokenInfo[tokenId].lastLevelTime.add(timeToLevel), "Too early to level up.");
         while(tokenInfo[tokenId].level < theLevel && block.timestamp >= tokenInfo[tokenId].lastLevelTime.add(timeToLevel))
         {

@@ -5,10 +5,17 @@ require("hardhat-abi-exporter");
 require("@nomiclabs/hardhat-etherscan");
 require("hardhat-interface-generator");
 require('solidity-coverage');
+require('hardhat-contract-sizer');
 
 module.exports = {
     networks: {
-        hardhat: {},
+        hardhat: {
+            forking: {
+                url: "https://xapi.testnet.fantom.network/lachesis",
+                gasMultiplier: 2,
+                blockNumber: 8630809
+            }
+        },
         ropsten: {
             url: "https://ropsten.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
             accounts: process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY, process.env.DAO_PRIVATE_KEY, process.env.DEV_PRIVATE_KEY] : [],

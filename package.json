@@ -41,6 +41,7 @@
     "ethjs-util": "^0.1.6",
     "hardhat": "^2.8.2",
     "hardhat-abi-exporter": "^2.8.0",
+    "hardhat-contract-sizer": "^2.5.1",
     "hardhat-etherscan": "^1.0.1",
     "hardhat-interface-generator": "^0.0.6",
     "solidity-coverage": "^0.7.20"
