@@ -17,6 +17,7 @@ pragma experimental ABIEncoderV2; //https://docs.soliditylang.org/en/v0.6.9/layo
 contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
     using Counters for Counters.Counter;
     using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20Lockable;
     using SafeMath for uint256;
 
     Counters.Counter private _tokenIds;
@@ -54,6 +55,16 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
     bool public emergencyDisableUnlock; // EMERGENCY ONLY.
     ITheoryUnlocker TheoryUnlockerGen0;
     IUniswapV2Router router;
+
+    uint256 public gameCostPerLevel;
+    uint256[] public extraGameCostLevel; // Used like feeStageTime. Starting level, not the level to level up to.
+    uint256[] public extraGameCostAmount; // Used like feeStagePercentage
+
+    // Events.
+    event Mint(address who, uint256 tokenId, uint256 level);
+    event Merge(address who, uint256 tokenId1, uint256 tokenId2, uint256 level1, uint256 level2, uint256 levelMerged);
+    event Level(address who, uint256 tokenId, uint256 leveledTo);
+    event Unlock(address who, uint256 tokenId, uint256 level, uint256 amountToUnlock);
 
     //Construction
     constructor(IERC20 _buy, uint256[2] memory _prices, IERC20Lockable[2] memory _theoryAndGame, address _communityFund, ITheoryUnlocker _gen0, IUniswapV2Router _router, uint256[] memory _maxLevelTime, uint256[] memory _maxLevelLevel, uint256[] memory _levelURIsLevel, string[] memory _levelURIsURI, uint256[] memory _levelURIsMax) ERC721("THEORY Unlocker Gen 1", "TUG1") public {
@@ -96,8 +107,12 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         disableMint = false;
         emergencyDisableUnlock = false;
         TheoryUnlockerGen0 = _gen0;
-        burnPercentage = 1000; //TODO: Administrative setting
-        router = _router; //TODO: Administrative setting
+        burnPercentage = 1000;
+        router = _router;
+
+        gameCostPerLevel = 1;
+        extraGameCostLevel = [0,5,10,15,20,25,30,35,40,45];
+        extraGameCostAmount = [0,5,10,15,20,25,30,35,40,45];
     }
 
     //Administrative functions
@@ -156,6 +171,24 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         }
         maxLevelTime = _maxLevelTime;
         maxLevelLevel = _maxLevelLevel;
+    }
+
+    function setGameCostForLevel(uint256 _gameCostPerLevel, uint256[] memory _extraGameCostLevel, uint256[] memory _extraGameCostAmount) public onlyAuthorized
+    {
+        require(_extraGameCostLevel.length > 0
+        && _extraGameCostLevel[0] == 0
+            && _extraGameCostAmount.length == _extraGameCostLevel.length,
+            "Game cost arrays must be equal in non-zero length and time should start at 0.");
+        require(_gameCostPerLevel <= 10, "Game cost per level can't be higher than 10");
+        uint256 i;
+        uint256 len = _extraGameCostAmount.length;
+        for(i = 0; i < len; i += 1)
+        {
+            require(_extraGameCostAmount[i] <= 100, "Extra game cost can't be higher than 100.");
+        }
+        gameCostPerLevel = _gameCostPerLevel;
+        extraGameCostLevel = _extraGameCostLevel;
+        extraGameCostAmount = _extraGameCostAmount;
     }
 
     function setCommunityFund(address _fund) public onlyAuthorized
@@ -289,6 +322,23 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
             }
         }
         return maxMinted;
+    }
+
+    function extraGameCost(uint256 level) public view returns (uint256)
+    {
+        uint256 cost = 0;
+        uint256 len = extraGameCostLevel.length;
+        uint256 n;
+        uint256 i;
+        for (n = len; n > 0; n -= 1) {
+            i = n-1;
+            if(level >= extraGameCostLevel[i])
+            {
+                cost = extraGameCostAmount[i];
+                break;
+            }
+        }
+        return cost;
     }
 
     function costOf(uint256 level) external view returns (uint256)
@@ -445,6 +495,8 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         require(bytes(tokenURI).length > 0, "Token URI is invalid.");
         _setTokenURI(newItemId, tokenURI);
 
+        emit Mint(msg.sender, newItemId, level);
+
         return newItemId;
     }
 
@@ -456,7 +508,9 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         require(ownerOf(tokenId1) == ownerOf(tokenId2), "Both tokens must have the same owner.");
         require(!tokenInfo[tokenId1].merged, "Token 1 has already been merged. Gen 1 NFTs can only be merged once.");
         require(!tokenInfo[tokenId2].merged, "Token 2 has already been merged. Gen 1 NFTs can only be merged once.");
-        uint256 level = tokenInfo[tokenId1].level.add(tokenInfo[tokenId2].level); //Add the two levels together.
+        uint256 levelFirst = tokenInfo[tokenId1].level;
+        uint256 levelSecond = tokenInfo[tokenId2].level;
+        uint256 level = levelFirst.add(levelSecond); //Add the two levels together.
         require(level > 0 && level <= maxLevel(), "Level must be > 0 and <= max level.");
         address player = ownerOf(tokenId1);
         string memory _tokenURI = tokenURI(tokenId1); //Takes the URI of the FIRST token. Make sure to warn users of this.
@@ -478,6 +532,8 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         require(bytes(_tokenURI).length > 0, "Token URI is invalid.");
         _setTokenURI(newItemId, _tokenURI);
 
+        emit Merge(msg.sender, tokenId1, tokenId2, levelFirst, levelSecond, level);
+
         return newItemId;
     }
 
@@ -492,11 +548,17 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         //creationTime[newItemId] = block.timestamp; //Same creation time.
         token.lastLevelTime = nextLevelTime;
         //_mint(player, newItemId); //Same ID.
+        uint256 baseCost = gameCostPerLevel.mul(token.level);
+        uint256 extraCost = extraGameCost(token.level);
+        uint256 amount = baseCost.add(extraCost);
+        game.safeTransferFrom(msg.sender, address(this), amount);
+        game.burn(amount);
         uint256 level = token.level.add(1);
         token.level = level;
         //string memory tokenURI = levelURI(level);
         //require(bytes(tokenURI).length > 0, "Token URI is invalid.");
         //_setTokenURI(tokenId, tokenURI);
+        emit Level(msg.sender, tokenId, level);
     }
 
     function levelUp(uint256 tokenId) onlyOneBlock public {
@@ -536,6 +598,7 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
         {
             TheoryUnlockerGen0.setLastUnlockTime(player, block.timestamp);
             TheoryUnlockerGen0.setLastLockAmount(player, amountLocked); //Only update.
+            emit Unlock(msg.sender, tokenId, tokenInfo[tokenId].level, 0);
             return;
         }
 
@@ -548,6 +611,7 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
             theory.unlockForUser(player, 0); //Unlock the natural amount.
             TheoryUnlockerGen0.setLastUnlockTime(player, block.timestamp);
             TheoryUnlockerGen0.setLastLockAmount(player, theory.lockOf(player)); //Update so that the player may unlock in the future.
+            emit Unlock(msg.sender, tokenId, tokenInfo[tokenId].level, 0);
             return;
         }
 
@@ -560,5 +624,6 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
 
         TheoryUnlockerGen0.setLastUnlockTime(player, block.timestamp);
         TheoryUnlockerGen0.setLastLockAmount(player, theory.lockOf(player)); //Set to lock amount AFTER unlock. Can only unlock any more locked will be used.
+        emit Unlock(msg.sender, tokenId, tokenInfo[tokenId].level, amountToUnlock);
     }
 }
