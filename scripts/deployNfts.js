@@ -44,8 +44,7 @@ async function main() {
     console.log("-- Theory Unlocker deployed to:", theoryUnlocker.address);
     await sToken.addAuthorized(theoryUnlocker.address);
 
-    const spookySwapFactory = await ethers.getContractAt("UniswapV2Factory", "0xEE4bC42157cf65291Ba2FE839AE127e3Cc76f741");
-    const spookySwapRouter = await ethers.getContractAt("UniswapV2Router02", "0xa6AD18C2aC47803E193F75c3677b14BF19B94883");
+    const spookySwapRouter = await ethers.getContractAt("UniswapV2Router02", "0xF491e7B69E4244ad4002BC14e878a34207E38c29");
 
     const TheoryUnlockerGen1 = await hre.ethers.getContractFactory("TheoryUnlockerGen1");
     const theoryUnlockerGen1 = await TheoryUnlockerGen1.deploy(iTokenAddress, [oneHundred.mul(5), oneHundred.mul(5)], [sToken.address, pTokenAddress], daofund.address, theoryUnlocker.address, spookySwapRouter.address,
