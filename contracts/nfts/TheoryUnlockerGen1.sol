@@ -455,7 +455,7 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
     }
 
     function mint(uint256 level, uint256 slippage) onlyOneBlock public returns (uint256) {
-        require(!disableMint || isAlwaysAuthorizedToMint(msg.sender), "Minting has been disabled.");
+        require(!disableMint || isAlwaysAuthorizedToMint(msg.sender), "Minting unavailable.");
         require(level > 0 && level <= maxLevel() || level > 0 && isAlwaysAuthorizedToMint(msg.sender), "Level must be > 0 and <= max level.");
         if(!isAlwaysAuthorizedToMint(msg.sender))
         {
@@ -464,22 +464,25 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
             uint256 amountForCommunityFund = totalAmount.sub(amountForGame);
             buyToken.safeTransferFrom(msg.sender, communityFund, amountForCommunityFund);
 
-            uint256 amountOutMin;
-            address[] memory path = new address[](2);
-            path[0] = address(buyToken);
-            path[1] = address(game);
+            if(amountForGame > 0)
             {
-                buyToken.safeTransferFrom(msg.sender, address(this), amountForGame);
-                uint256[] memory amountsOut = router.getAmountsOut(amountForGame, path);
-                uint256 amountOut = amountsOut[amountsOut.length - 1];
-                amountOutMin = amountOut.sub(amountOut.mul(slippage).div(10000));
-            }
-            {
-                buyToken.safeApprove(address(router), 0);
-                buyToken.safeApprove(address(router), amountForGame);
-                uint256[] memory amountsObtained = router.swapExactTokensForTokens(amountForGame, amountOutMin, path, address(this), block.timestamp);
-                uint256 gameObtained = amountsObtained[amountsObtained.length - 1];
-                game.burn(gameObtained);
+                uint256 amountOutMin;
+                address[] memory path = new address[](2);
+                path[0] = address(buyToken);
+                path[1] = address(game);
+                {
+                    buyToken.safeTransferFrom(msg.sender, address(this), amountForGame);
+                    uint256[] memory amountsOut = router.getAmountsOut(amountForGame, path);
+                    uint256 amountOut = amountsOut[amountsOut.length - 1];
+                    amountOutMin = amountOut.sub(amountOut.mul(slippage).div(10000));
+                }
+                {
+                    buyToken.safeApprove(address(router), 0);
+                    buyToken.safeApprove(address(router), amountForGame);
+                    uint256[] memory amountsObtained = router.swapExactTokensForTokens(amountForGame, amountOutMin, path, address(this), block.timestamp);
+                    uint256 gameObtained = amountsObtained[amountsObtained.length - 1];
+                    game.burn(gameObtained);
+                }
             }
         }
 
@@ -556,8 +559,11 @@ contract TheoryUnlockerGen1 is ERC721, AuthorizableNoOperator, ContractGuard {
             uint256 baseCost = gameCostPerLevel.mul(token.level);
             uint256 extraCost = extraGameCost(token.level);
             uint256 amount = baseCost.add(extraCost);
-            game.safeTransferFrom(msg.sender, address(this), amount);
-            game.burn(amount);
+            if(amount > 0)
+            {
+                game.safeTransferFrom(msg.sender, address(this), amount);
+                game.burn(amount);
+            }
         }
         uint256 level = token.level.add(1);
         token.level = level;

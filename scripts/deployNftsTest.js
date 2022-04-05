@@ -53,7 +53,11 @@ async function main() {
     const theoryUnlockerGen1 = await TheoryUnlockerGen1.deploy(iTokenAddress, [oneHundred.mul(5), oneHundred.mul(5)], [sToken.address, pTokenAddress], daofund.address, theoryUnlocker.address, spookySwapRouter.address,
         [zero, startTime.add(days.mul(15)), startTime.add(days.mul(15).mul(2)), startTime.add(days.mul(15).mul(3)), startTime.add(days.mul(15).mul(4)), startTime.add(days.mul(15).mul(5)), startTime.add(days.mul(15).mul(6)), startTime.add(days.mul(15).mul(7)), startTime.add(days.mul(15).mul(8)), startTime.add(days.mul(15).mul(9))],
         [BigNumber.from(5),BigNumber.from(10),BigNumber.from(15),BigNumber.from(20),BigNumber.from(25),BigNumber.from(30),BigNumber.from(35),BigNumber.from(40),BigNumber.from(45),BigNumber.from(50)],
-        [zero,BigNumber.from(20),BigNumber.from(40),BigNumber.from(50)], ["bronze","silver","gold","platinum"],
+        [zero,BigNumber.from(20),BigNumber.from(40),BigNumber.from(50)],
+        ["ipfs://bafkreias23kdbna4vobjcn4eyqm73gnq6malettxrvjwyefhmscngj5b2y",
+        "ipfs://bafkreibdipabxlgucnrerdtgakwbg4ob4xua4qpfmk7sm57bnndywtuwvi",
+        "ipfs://bafkreidvdxnldspflsqw35qlbdmhsyafyvbykzadptzjwatkh5gclhbrrm",
+        "ipfs://bafkreif66egaonk5fa7ddfh4dnhtdx7c4z7fhz3dpp6exuw7kyu4stxkwu"],
         [BigNumber.from(300),BigNumber.from(100),BigNumber.from(50),BigNumber.from(10)]);
     await theoryUnlockerGen1.deployed();
     console.log("-- Theory Unlocker Gen 1 deployed to:", theoryUnlockerGen1.address);

@@ -1087,7 +1087,7 @@ describe('nftTests', function () {
             await iToken.approve(theoryUnlockerGen1.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
             await theoryUnlockerGen1.setDisableMint(true);
             await theoryUnlockerGen1.renounceOwnership();
-            await expect(theoryUnlockerGen1.mint(1, 50)).to.be.revertedWith('Minting has been disabled.');
+            await expect(theoryUnlockerGen1.mint(1, 50)).to.be.revertedWith('Minting unavailable.');
         });
         it("mint zero FAILURE", async () => {
             await iToken.approve(theoryUnlockerGen1.address, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
