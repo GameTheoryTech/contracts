@@ -20,7 +20,9 @@
     "flatten": "hardhat flatten contracts/distribution/TheoryRewardPool.sol > TheoryRewardPoolFlattened.sol",
     "allocateSeigniorage": "hardhat run --network fantom scripts/allocateSeigniorageBot.js",
     "discord": "hardhat run --network fantom scripts/discordBot.js",
-    "disableMint": "hardhat run --network fantom scripts/disableMintBot.js"
+    "disableMint": "hardhat run --network fantom scripts/disableMintBot.js",
+    "getGen1Burn": "hardhat run --network fantom scripts/getGen1Burn.js",
+    "getAllStakers": "hardhat run --network fantom scripts/getAllStakers.js"
   },
   "keywords": [],
   "author": "",
