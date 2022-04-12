@@ -107,7 +107,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator {
         return transferFrom(from, to, amount);
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
+    function _transfer(address from, address to, uint256 amount) internal virtual override {
         if(!(authorized[msg.sender] || owner() == msg.sender || authorized[to] || owner() == to))
         {
             require(approveTransferFrom[to] == from, "Receiver did not approve transfer.");
@@ -115,11 +115,16 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator {
             uint256 nextTime = block.timestamp.add(minLockTime);
             if(nextTime > lockToTime[to]) _lock(to, nextTime);
         }
-        super._beforeTokenTransfer(from, to, amount);
+        super._transfer(from, to, amount);
 
     }
 
-    function buyFromTheory() public
+    function buyFromTheory(uint256 amountInTheory) public
+    {
+
+    }
+
+    function sellToTheory(uint256 amountInMaster) public
     {
 
     }
