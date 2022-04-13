@@ -218,7 +218,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 
     function withdrawExternalTheory(uint256 amount) external onlyAuthorized onlyOneBlock {
         //This doesn't prevent all damage to people who got in after 1.0x, but it prevents a full withdrawal.
-        require(amount > extraTheoryAdded, "Can't withdraw past 1.0x.");
+        require(amount >= extraTheoryAdded, "Can't withdraw past 1.0x.");
         extraTheoryAdded = extraTheoryAdded.sub(amount);
         uint256 initialBalance = theory.balanceOf(address(this));
         theoretics.withdraw(amount);
