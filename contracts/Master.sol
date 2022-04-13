@@ -37,12 +37,14 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     event Deposit(address indexed user, uint256 amountInTheory, uint256 amountOutMaster);
     event Withdraw(address indexed user, uint256 amountInMaster, uint256 amountOutTheory);
 
+    //Permissions needed: game (Game)
     constructor(IERC20Lockable _theory,
                 IERC20Lockable _game,
                 ITheoretics _theoretics,
                 address _communityFund) public ERC20("Master Token", "MASTER") {
         theory = _theory;
         game = _game;
+        theoretics = _theoretics;
         communityFund = _communityFund;
         minLockTime = 365 days;
     }
@@ -54,7 +56,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     function theoryToMaster(uint256 _amount) public view returns (uint256)
     {
         // Gets the amount of GovernanceToken locked in the contract
-        uint256 totalGovernanceToken = theoretics.balanceOf(address(this));
+        uint256 totalGovernanceToken = theoretics.balanceOf(address(this)); //TODO: add theory.balanceOf, because of the new epoch system.
         // Gets the amount of xGovernanceToken in existence
         uint256 totalShares = totalSupply();
         // If no xGovernanceToken exists, it is 1:1
@@ -70,7 +72,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     function masterToTheory(uint256 _share) public view returns (uint256)
     {
         // Gets the amount of GovernanceToken locked in the contract
-        uint256 totalGovernanceToken = theoretics.balanceOf(address(this));
+        uint256 totalGovernanceToken = theoretics.balanceOf(address(this)); //TODO: add theory.balanceOf, because of the new epoch system.
         // Gets the amount of xGovernanceToken in existence
         uint256 totalShares = totalSupply();
         // If no xGovernanceToken exists, it is 1:1
@@ -138,8 +140,24 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     {
         //Unlock all LGAME, transfer GAME, then relock at normal rate.
         uint256 initialBalance = game.totalBalanceOf(address(this));
+        //uint256 _withdrawLockupEpochs = theoretics.withdrawLockupEpochs();
+        //uint256 _rewardLockupEpochs = theoretics.rewardLockupEpochs();
+        //uint256 _pegMaxUnlock = theoretics.pegMaxUnlock();
+        //theoretics.setLockUp(0, 0, _pegMaxUnlock); //Can't use these because of onlyOneBlock.
+
+        //We may have had a saving grace: But we do have a saving grace: farm.getLockPercentage(). If that is at 95%, then we have 0 lockups.
+        //But I was TOO anal about security: The function returns 0 after the pool ends, no matter what.
+
+        //TODO: Instead, we must limit claiming and staking to every getCurrentWithdrawEpochs() epochs with a window of 5 hours and 30 minutes.
+        //TODO: Instead of withdrawing/claiming from theoretics here, we store withdraw requests and withdraw the full amount for everybody at once after 5 hours and 30 minutes.
+        //TODO: If there are no withdraw requests, just claim and stake instead of withdrawing and staking. If there are no claim/withdraw requests, just stake. If there are no stake requests, fail the function.
+        //TODO: The user can then come back at any time after to receive their withdraw/claim.
+        //TODO: If getCurrentWithdrawEpochs() is 0, just call the initiator function immediately.
+
+        //TODO: If you claim GAME after your lock time is over, you are locked up for 30 more days.
         if(withdrawAmount == 0) theoretics.claimReward();
         else theoretics.withdraw(withdrawAmount);
+        //theoretics.setLockUp(_withdrawLockupEpochs, _rewardLockupEpochs, _pegMaxUnlock);
         //Unlock
         game.unlockForUser(address(this), game.lockOf(address(this)));
         uint256 newBalance = game.totalBalanceOf(address(this));
@@ -211,12 +229,12 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         _token.safeTransfer(to, amount);
     }
 
-    function stakeExternalTheory(uint256 amount) external onlyAuthorized onlyOneBlock {
+    function stakeExternalTheory(uint256 amount) external onlyAuthorized onlyOneBlock {  //TODO: Request stake instead of stake. Keep track of THEORY that was recently requested to stake.
         extraTheoryAdded = extraTheoryAdded.add(amount);
         theoretics.stake(amount);
     }
 
-    function withdrawExternalTheory(uint256 amount) external onlyAuthorized onlyOneBlock {
+    function withdrawExternalTheory(uint256 amount) external onlyAuthorized onlyOneBlock { //TODO: Change this function to request withdrawal.
         //This doesn't prevent all damage to people who got in after 1.0x, but it prevents a full withdrawal.
         require(amount >= extraTheoryAdded, "Can't withdraw past 1.0x.");
         extraTheoryAdded = extraTheoryAdded.sub(amount);
