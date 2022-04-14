@@ -351,6 +351,8 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
             totalStakeRequested = totalStakeRequested.add(amountInTheory);
         }
 
+        user.lastStakeRequestBlock = block.number;
+
         emit Deposit(msg.sender, amountInTheory, what);
     }
 
