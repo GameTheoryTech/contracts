@@ -43,6 +43,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     //uint256 public extraTheoryWithdrawRequested;
 
     uint256 totalStakeRequestedInTheory;
+    uint256 totalStakeRequestedInMaster;
     uint256 totalWithdrawRequestedInTheory;
     uint256 totalWithdrawRequestedInMaster;
     uint256 totalStakeUnclaimedInMaster;
