@@ -381,7 +381,10 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         require(amountInMaster > 0, "No zero amount allowed.");
         require(user.stakeRequestedInMaster == 0 && lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
 
+        if(amountInMaster == balanceOf(msg.sender)) _claimGame(); //Final GAME claim before moving to THEORY.
+
         //Add. Since we have to transfer here to avoid transfer exploits, we cannot do a replace.
+        _transfer(msg.sender, address(this), amountInMaster); //This will handle exceeded balance.
         user.withdrawRequestedInMaster = user.withdrawRequestedInMaster.add(amountInMaster);
         totalWithdrawRequestedInMaster = totalWithdrawRequestedInMaster.add(amountInMaster);
 
