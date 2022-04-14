@@ -240,92 +240,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         emit RewardPaid(msg.sender, reward, lockAmount);
     }
 
-    //Public functions
-    function buyFromTheory(uint256 amountInTheory, uint256 lockTime) public onlyOneBlock
-    {
-        require(amountInTheory > 0, "No zero amount allowed.");
-        UserInfo storage user = userInfo[msg.sender];
-        require(user.withdrawRequested == 0 && lastInitiatePart1Block > user.lastWithdrawRequestBlock, "Cannot stake with a withdraw pending.");
-
-        //Lock
-        if(lockTime < minLockTime) lockTime = minLockTime;
-        //Just in case we want bonuses/airdrops for those who lock longer. This would have to be done outside of this contract, as it provides no bonuses by itself.
-        uint256 nextTime = block.timestamp.add(lockTime);
-
-        user.chosenLockTime = lockTime;
-        if(nextTime > user.lockToTime) _lock(msg.sender, nextTime);
-
-        //Mint
-        uint256 what = theoryToMaster(amountInTheory);
-        _mint(msg.sender, what);
-        theory.safeTransferFrom(msg.sender, address(this), amountInTheory);
-
-        if(lastInitiatePart2Epoch == theoretics.epoch() || theoretics.getCurrentWithdrawEpochs() == 0) theoretics.stake(amountInTheory); //Stake if we already have staked this epoch or are at 0 withdraw epochs.
-        else
-        {
-            totalStakeRequested = totalStakeRequested.add(amountInTheory);
-        }
-
-        emit Deposit(msg.sender, amountInTheory, what);
-    }
-
-    function sellToTheory() public onlyOneBlock
-    {
-        UserInfo storage user = userInfo[msg.sender];
-        require(block.timestamp >= user.lockToTime, "Still locked!");
-        require(user.withdrawRequested > 0, "No zero amount allowed.");
-        require(lastInitiatePart1Block > user.lastWithdrawRequestBlock, "Initiator Part 1 not yet called or called too soon.");
-
-        //Burn
-        uint256 what = masterToTheoryOwed(user.withdrawRequested, totalGovernanceTokenAtWithdraw, totalSharesAtWithdraw);
-        //In an emergency, there might be people who fail here.
-        //However, there is a balance between user security and protocol security.
-        //Keeping it simple to avoid potential exploits.
-        //This has already gotten way more complicated due to the epoch system.
-
-        totalWithdrawUnclaimed = totalWithdrawUnclaimed.sub(what);
-        totalMasterUnclaimed = totalMasterUnclaimed.sub(user.withdrawRequested);
-        if(balanceOf(msg.sender) == 0) _claimGame(); //Get final GAME.
-        _burn(address(this), user.withdrawRequested);
-        user.withdrawRequested = 0;
-        theory.safeTransfer(msg.sender, what);
-        emit Withdraw(msg.sender, user.withdrawRequested, what);
-    }
-
-    function requestSellToTheory(uint256 amountInMaster) public onlyOneBlock
-    {
-        UserInfo storage user = userInfo[msg.sender];
-        require(block.timestamp >= user.lockToTime, "Still locked!");
-        require(amountInMaster > 0, "No zero amount allowed.");
-        require(lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
-
-        //Add. Since we have to transfer here to avoid transfer exploits, we cannot do a replace.
-        _transfer(msg.sender, address(this), amountInMaster); //This will handle exceeded balance.
-        user.withdrawRequested = user.withdrawRequested.add(amountInMaster);
-        totalWithdrawRequested = totalWithdrawRequested.add(amountInMaster);
-        totalMasterUnclaimed = totalMasterUnclaimed.add(amountInMaster);
-        user.lastWithdrawRequestBlock = block.number;
-        emit WithdrawRequest(msg.sender, amountInMaster);
-        if(theoretics.getCurrentWithdrawEpochs() == 0)
-        {
-            initiatePart1();
-            sellToTheory();
-        }
-    }
-
-    function claimGame() public onlyOneBlock
-    {
-        require(anyGameAvailableToClaim(msg.sender), "No GAME to claim.");
-        //If you claim GAME after your lock time is over, you are locked up for 30 more days by default.
-        UserInfo storage user = userInfo[msg.sender];
-        if(block.timestamp >= user.lockToTime)
-        {
-            user.lockToTime = block.timestamp.add(unlockedClaimPenalty);
-        }
-        _claimGame();
-    }
-
-    function initiatePart1() public onlyOneBlock
+    function _initiatePart1() internal
     {
         uint256 withdrawEpochs = theoretics.getCurrentWithdrawEpochs();
         //Every getCurrentWithdrawEpochs() epochs
@@ -385,6 +300,102 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 
         lastInitiatePart1Epoch = theoretics.epoch();
         lastInitiatePart1Block = block.number;
+    }
+
+    function _sellToTheory() internal
+    {
+        UserInfo storage user = userInfo[msg.sender];
+        require(block.timestamp >= user.lockToTime, "Still locked!");
+        require(user.withdrawRequested > 0, "No zero amount allowed.");
+        require(theoretics.getCurrentWithdrawEpochs() == 0 || lastInitiatePart1Block > user.lastWithdrawRequestBlock, "Initiator Part 1 not yet called or called too soon.");
+
+        //Burn
+        uint256 what = masterToTheoryOwed(user.withdrawRequested, totalGovernanceTokenAtWithdraw, totalSharesAtWithdraw);
+        //In an emergency, there might be people who fail here.
+        //However, there is a balance between user security and protocol security.
+        //Keeping it simple to avoid potential exploits.
+        //This has already gotten way more complicated due to the epoch system.
+
+        totalWithdrawUnclaimed = totalWithdrawUnclaimed.sub(what);
+        totalMasterUnclaimed = totalMasterUnclaimed.sub(user.withdrawRequested);
+        if(balanceOf(msg.sender) == 0) _claimGame(); //Get final GAME.
+        _burn(address(this), user.withdrawRequested);
+        user.withdrawRequested = 0;
+        theory.safeTransfer(msg.sender, what);
+        emit Withdraw(msg.sender, user.withdrawRequested, what);
+    }
+
+    //Public functions
+    function buyFromTheory(uint256 amountInTheory, uint256 lockTime) public onlyOneBlock
+    {
+        require(amountInTheory > 0, "No zero amount allowed.");
+        UserInfo storage user = userInfo[msg.sender];
+        require(user.withdrawRequested == 0 && lastInitiatePart1Block > user.lastWithdrawRequestBlock, "Cannot stake with a withdraw pending.");
+
+        //Lock
+        if(lockTime < minLockTime) lockTime = minLockTime;
+        //Just in case we want bonuses/airdrops for those who lock longer. This would have to be done outside of this contract, as it provides no bonuses by itself.
+        uint256 nextTime = block.timestamp.add(lockTime);
+
+        user.chosenLockTime = lockTime;
+        if(nextTime > user.lockToTime) _lock(msg.sender, nextTime);
+
+        //Mint
+        uint256 what = theoryToMaster(amountInTheory);
+        _mint(msg.sender, what);
+        theory.safeTransferFrom(msg.sender, address(this), amountInTheory);
+
+        if(lastInitiatePart2Epoch == theoretics.epoch() || theoretics.getCurrentWithdrawEpochs() == 0) theoretics.stake(amountInTheory); //Stake if we already have staked this epoch or are at 0 withdraw epochs.
+        else
+        {
+            totalStakeRequested = totalStakeRequested.add(amountInTheory);
+        }
+
+        emit Deposit(msg.sender, amountInTheory, what);
+    }
+
+    function sellToTheory() public onlyOneBlock
+    {
+        require(theoretics.getCurrentWithdrawEpochs() != 0, "Call requestSellToTheory instead.");
+        _sellToTheory();
+    }
+
+    function requestSellToTheory(uint256 amountInMaster) public onlyOneBlock
+    {
+        UserInfo storage user = userInfo[msg.sender];
+        require(block.timestamp >= user.lockToTime, "Still locked!");
+        require(amountInMaster > 0, "No zero amount allowed.");
+        require(lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
+
+        //Add. Since we have to transfer here to avoid transfer exploits, we cannot do a replace.
+        _transfer(msg.sender, address(this), amountInMaster); //This will handle exceeded balance.
+        user.withdrawRequested = user.withdrawRequested.add(amountInMaster);
+        totalWithdrawRequested = totalWithdrawRequested.add(amountInMaster);
+        totalMasterUnclaimed = totalMasterUnclaimed.add(amountInMaster);
+        user.lastWithdrawRequestBlock = block.number;
+        emit WithdrawRequest(msg.sender, amountInMaster);
+        if(theoretics.getCurrentWithdrawEpochs() == 0)
+        {
+            _initiatePart1();
+            _sellToTheory();
+        }
+    }
+
+    function claimGame() public onlyOneBlock
+    {
+        require(anyGameAvailableToClaim(msg.sender), "No GAME to claim.");
+        //If you claim GAME after your lock time is over, you are locked up for 30 more days by default.
+        UserInfo storage user = userInfo[msg.sender];
+        if(block.timestamp >= user.lockToTime)
+        {
+            user.lockToTime = block.timestamp.add(unlockedClaimPenalty);
+        }
+        _claimGame();
+    }
+
+    function initiatePart1() public onlyOneBlock
+    {
+       _initiatePart1();
     }
 
     function initiatePart2() public onlyOneBlock
