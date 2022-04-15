@@ -8,6 +8,7 @@ import "./interfaces/IERC20Lockable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./interfaces/ITheoretics.sol";
 import "./utils/ContractGuard.sol";
+import "./interfaces/ITreasury.sol";
 
 contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     using SafeMath for uint256;
@@ -32,7 +33,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     IERC20Lockable public theory;
     IERC20Lockable public game;
     ITheoretics public theoretics;
-    address public communityFund;
+    ITreasury public treasury;
     uint256 public minLockTime;
     uint256 public unlockedClaimPenalty;
 
@@ -59,11 +60,11 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     constructor(IERC20Lockable _theory,
                 IERC20Lockable _game,
                 ITheoretics _theoretics,
-                address _communityFund) public ERC20("Master Token", "MASTER") {
+                ITreasury _treasury) public ERC20("Master Token", "MASTER") {
         theory = _theory;
         game = _game;
         theoretics = _theoretics;
-        communityFund = _communityFund;
+        treasury = _treasury;
         minLockTime = 365 days;
         unlockedClaimPenalty = 30 days;
     }
@@ -127,7 +128,15 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     }
 
     //Admin functions
-    //TODO: Administrative setters for every variable.
+    function setTimes(uint256 lockTime, uint256 penalty) external onlyAuthorized
+    {
+        //Default: 1 year/365 days
+        require(lockTime <= 730 days, "Lock time too high."); //730 days/2 years = length from beginning of emissions to full LTHEORY unlock.  No need to be higher than that.
+        require(penalty <= lockTime, "Penalty too high."); //No higher than lock time.
+        minLockTime = lockTime;
+        unlockedClaimPenalty = penalty;
+    }
+
     function lockAndTransferFrom(address from, address to, uint256 amount, uint256 lockTo, bool lockAfter) public onlyAuthorized onlyOneBlock returns (bool)
     {
         bool result = false;
@@ -179,7 +188,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     }
 
     function _transfer(address from, address to, uint256 amount) internal virtual override {
-        if(!(authorized[msg.sender] || owner() == msg.sender || communityFund == msg.sender || address(this) == msg.sender || authorized[to] || owner() == to || communityFund == to || address(this) == to))
+        if(!(authorized[msg.sender] || owner() == msg.sender || treasury.daoFund() == msg.sender || address(this) == msg.sender || authorized[to] || owner() == to || treasury.daoFund() == to || address(this) == to))
         {
             UserInfo storage user = userInfo[to];
             require(user.approveTransferFrom == from, "Receiver did not approve transfer.");
@@ -306,11 +315,11 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
                 uint256 whatAfterWithdrawFee = newBalanceTheory.sub(initialBalanceTheory);
 
                 uint256 withdrawFee = what.sub(whatAfterWithdrawFee);
-                if(withdrawFee > 0 && theory.allowance(communityFund, address(this)) > 0) theory.safeTransferFrom(communityFund, address(this), withdrawFee); //Send withdraw fee back to us. Don't allow this function to hold up funds.
+                if(withdrawFee > 0 && theory.allowance(treasury.daoFund(), address(this)) > 0) theory.safeTransferFrom(treasury.daoFund(), address(this), withdrawFee); //Send withdraw fee back to us. Don't allow this function to hold up funds.
 
     //            if(extraTheoryWithdrawRequested > 0)
     //            {
-    //                theory.safeTransfer(communityFund, extraTheoryWithdrawRequested);
+    //                theory.safeTransfer(treasury.daoFund(), extraTheoryWithdrawRequested);
     //                extraTheoryWithdrawRequested = 0;
     //            }
             }
