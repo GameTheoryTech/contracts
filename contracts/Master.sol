@@ -21,8 +21,6 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         uint256 chosenLockTime;
         address approveTransferFrom;
         uint256 lastTotalGameClaimed;
-        uint256 stakeRequestedInMaster;
-        uint256 stakeRequestedInTheory;
         uint256 withdrawRequestedInMaster;
         uint256 withdrawRequestedInTheory;
         uint256 lastStakeRequestBlock;
@@ -43,10 +41,8 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     //uint256 public extraTheoryWithdrawRequested;
 
     uint256 totalStakeRequestedInTheory;
-    uint256 totalStakeRequestedInMaster;
     uint256 totalWithdrawRequestedInTheory;
     uint256 totalWithdrawRequestedInMaster;
-    uint256 totalStakeUnclaimedInMaster;
     uint256 totalWithdrawUnclaimedInTheory;
     uint256 lastInitiatePart1Epoch;
     uint256 lastInitiatePart2Epoch;
@@ -56,7 +52,6 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 
     event RewardPaid(address indexed user, uint256 reward, uint256 lockAmount);
     event Deposit(address indexed user, uint256 amountInTheory, uint256 amountOutMaster);
-    event DepositRequest(address indexed user, uint256 amountInTheory, uint256 amountOutMaster);
     event Withdraw(address indexed user, uint256 amountInMaster, uint256 amountOutTheory);
     event WithdrawRequest(address indexed user, uint256 amountInMaster, uint256 amountOutTheory);
 
@@ -79,7 +74,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     function theoryToMaster(uint256 _amount) public view returns (uint256)
     {
         // Gets the amount of GovernanceToken locked in the contract
-        uint256 totalGovernanceToken = theoretics.balanceOf(address(this));
+        uint256 totalGovernanceToken = theoretics.balanceOf(address(this)).add(totalStakeRequestedInTheory);
         // Gets the amount of xGovernanceToken in existence
         uint256 totalShares = totalSupply();
         // If no xGovernanceToken exists, it is 1:1
@@ -95,7 +90,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     function masterToTheory(uint256 _share) public view returns (uint256)
     {
         // Gets the amount of GovernanceToken locked in the contract
-        uint256 totalGovernanceToken = theoretics.balanceOf(address(this));
+        uint256 totalGovernanceToken = theoretics.balanceOf(address(this)).add(totalStakeRequestedInTheory);
         // Gets the amount of xGovernanceToken in existence
         uint256 totalShares = totalSupply();
         // If no xGovernanceToken exists, it is 1:1
@@ -149,8 +144,8 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     function transferToken(IERC20 _token, address to, uint256 amount) external onlyAuthorized onlyOneBlock {
         //Required in order move THEORY and other tokens if they get stuck in the contract.
         //Some security measures in place for THEORY.
-        require(address(_token) != address(this) || amount <= balanceOf(address(this)).sub(totalWithdrawRequestedInMaster).sub(totalStakeUnclaimedInMaster));
-        //require(address(_token) != address(theory) || amount <= theory.balanceOf(address(this)).sub(totalStakeRequested.add(totalWithdrawUnclaimed)), "Cannot withdraw pending funds."); //To prevent a number of issues that crop up when extra THEORY is removed, this function as been disabled. THEORY sent here is effectively burned.
+        require(address(_token) != address(this) || amount <= balanceOf(address(this)).sub(totalWithdrawRequestedInMaster));
+        //require(address(_token) != address(theory) || amount <= theory.balanceOf(address(this)).sub(totalStakeRequested.add(totalWithdrawUnclaimed)), "Cannot withdraw pending funds."); //To prevent a number of issues that crop up when extra THEORY is removed, this function as been disabled. THEORY sent here is essentially donated to MASTER if staked. Otherwise, it is out of circulation.
         require(address(_token) != address(theory), "Cannot bring down price of MASTER.");
         _token.safeTransfer(to, amount);
     }
@@ -284,25 +279,45 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         else
         {
             uint256 initialBalanceTheory = theory.balanceOf(address(this));
+
             uint256 what = totalWithdrawRequestedInTheory
             //.add(extraTheoryWithdrawRequested);
             ;
-
-            theoretics.withdraw(what);
             totalWithdrawRequestedInTheory = 0;
-            totalWithdrawUnclaimedInTheory = totalWithdrawUnclaimedInTheory.add(what);
 
-            uint256 newBalanceTheory = theory.balanceOf(address(this));
-            uint256 whatAfterWithdrawFee = newBalanceTheory.sub(initialBalanceTheory);
+            //Now that I think about it, we could probably do something like this to burn immediately and avoid delayed prices altogether. But it is getting too complicated, and the current system helps MASTER holders anyways.
+            if(what > totalStakeRequestedInTheory) //Withdraw > Stake: Only withdraw. We need a bit more to pay our debt.
+            {
+                what = what.sub(totalStakeRequestedInTheory); //Withdraw less to handle "stake". Reserves (staked amount chilling in the contract) will cover some of our debt (requested withdraws).
+                totalStakeRequestedInTheory = 0; //Don't stake in part 2 anymore, as it was already technically "staked" here.
+            }
+            else //Stake >= Withdraw: Only stake or do nothing. We have enough THEORY in our reserves to support all the withdraws.
+            {
+                totalStakeRequestedInTheory = totalStakeRequestedInTheory.sub(what); //Stake less to handle "withdraw". Reserves (staked amount chilling in the contract) will cover all of our debt (requested withdraws). Stake the remaining reserves here, if any.
+                what = 0; //Don't withdraw in part 1 anymore, it was already "withdrawn" here.
+            }
 
-            uint256 withdrawFee = what.sub(whatAfterWithdrawFee);
-            if(withdrawFee > 0 && theory.allowance(communityFund, address(this)) > 0) theory.safeTransferFrom(communityFund, address(this), withdrawFee); //Send withdraw fee back to us. Don't allow this function to hold up funds.
+            if(what > 0)
+            {
+                theoretics.withdraw(what);
+                totalWithdrawUnclaimedInTheory = totalWithdrawUnclaimedInTheory.add(what);
 
-//            if(extraTheoryWithdrawRequested > 0)
-//            {
-//                theory.safeTransfer(communityFund, extraTheoryWithdrawRequested);
-//                extraTheoryWithdrawRequested = 0;
-//            }
+                uint256 newBalanceTheory = theory.balanceOf(address(this));
+                uint256 whatAfterWithdrawFee = newBalanceTheory.sub(initialBalanceTheory);
+
+                uint256 withdrawFee = what.sub(whatAfterWithdrawFee);
+                if(withdrawFee > 0 && theory.allowance(communityFund, address(this)) > 0) theory.safeTransferFrom(communityFund, address(this), withdrawFee); //Send withdraw fee back to us. Don't allow this function to hold up funds.
+
+    //            if(extraTheoryWithdrawRequested > 0)
+    //            {
+    //                theory.safeTransfer(communityFund, extraTheoryWithdrawRequested);
+    //                extraTheoryWithdrawRequested = 0;
+    //            }
+            }
+            else
+            {
+                theoretics.claimReward(); //Claim.
+            }
         }
         //theoretics.setLockUp(_withdrawLockupEpochs, _rewardLockupEpochs, _pegMaxUnlock);
         //Unlock
@@ -355,23 +370,18 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         uint256 what = theoryToMaster(amountInTheory);
         theory.safeTransferFrom(msg.sender, address(this), amountInTheory);
 
-        emit DepositRequest(msg.sender, amountInTheory, what);
+        _mint(msg.sender, what); //Don't delay mint, since price has to stay the same or higher (or else withdraws could be borked). Delayed buys could make it go lower.
         if(lastInitiatePart2Epoch == theoretics.epoch() || theoretics.getCurrentWithdrawEpochs() == 0)
         {
-            _mint(msg.sender, what);
             theoretics.stake(amountInTheory); //Stake if we already have staked this epoch or are at 0 withdraw epochs.
-            emit Deposit(msg.sender, amountInTheory, what);
         }
         else
         {
-            user.stakeRequestedInMaster = user.stakeRequestedInMaster.add(what);
-            totalStakeRequestedInMaster = totalStakeRequestedInMaster.add(what); //Delay our mint so that we only mint when we stake so our ratio stays the same.
-
-            user.stakeRequestedInTheory = user.stakeRequestedInTheory.add(what);
             totalStakeRequestedInTheory = totalStakeRequestedInTheory.add(amountInTheory);
         }
 
         user.lastStakeRequestBlock = block.number;
+        emit Deposit(msg.sender, amountInTheory, what);
     }
 
     function requestSellToTheory(uint256 amountInMaster) public onlyOneBlock
@@ -379,7 +389,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         UserInfo storage user = userInfo[msg.sender];
         require(block.timestamp >= user.lockToTime, "Still locked!");
         require(amountInMaster > 0, "No zero amount allowed.");
-        require(user.stakeRequestedInMaster == 0 && lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
+        require(lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
 
         if(amountInMaster == balanceOf(msg.sender)) _claimGame(); //Final GAME claim before moving to THEORY.
 
@@ -402,16 +412,6 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
             _initiatePart1();
             _sellToTheory();
         }
-    }
-
-    function buyFromTheory() public onlyOneBlock
-    {
-        require(theoretics.getCurrentWithdrawEpochs() != 0, "Call requestBuyFromTheory instead.");
-        UserInfo storage user = userInfo[msg.sender];
-        require(user.stakeRequestedInMaster > 0, "No zero amount allowed.");
-        require(theoretics.getCurrentWithdrawEpochs() == 0 || lastInitiatePart2Block > user.lastStakeRequestBlock, "Initiator Part 2 not yet called or called too soon.");
-        //TODO: Subtract from totalStakeUnclaimedInMaster, user.stakeRequestedInMaster, and user.stakeRequestedInTheory, then send to msg.sender.
-        //emit Deposit(msg.sender, amountInTheory, what);
     }
 
     function sellToTheory() public onlyOneBlock
@@ -450,12 +450,9 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         require(theoretics.getCurrentWithdrawEpochs() == 0 || lastInitiatePart1Epoch == theoretics.epoch(), "Initiate part 1 first.");
         if(totalStakeRequestedInTheory > 0)
         {
-            _mint(address(this), totalStakeRequestedInMaster);
             theoretics.stake(totalStakeRequestedInTheory);
             //extraTheoryAdded = extraTheoryAdded.add(extraTheoryStakeRequested); //Track extra theory that we have staked.
             //extraTheoryStakeRequested = 0;
-            totalStakeUnclaimedInMaster = totalStakeUnclaimedInMaster.add(totalStakeRequestedInMaster);
-            totalStakeRequestedInMaster = 0;
             totalStakeRequestedInTheory = 0;
         }
         lastInitiatePart2Epoch = theoretics.epoch();
