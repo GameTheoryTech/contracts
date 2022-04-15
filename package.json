@@ -7,6 +7,7 @@
     "test": "hardhat test",
     "forkTest": "hardhat test test/test.js",
     "nftTest": "hardhat test test/nftTest.js",
+    "masterTest": "hardhat test test/masterTest.js",
     "deploy": "hardhat run --network fantom scripts/deploy.js",
     "deployNfts": "hardhat run --network fantom scripts/deployNfts.js",
     "deployZap": "hardhat run --network fantom scripts/deployZap.js",
@@ -22,7 +23,8 @@
     "discord": "hardhat run --network fantom scripts/discordBot.js",
     "disableMint": "hardhat run --network fantom scripts/disableMintBot.js",
     "getGen1Burn": "hardhat run --network fantom scripts/getGen1Burn.js",
-    "getAllStakers": "hardhat run --network fantom scripts/getAllStakers.js"
+    "getAllStakers": "hardhat run --network fantom scripts/getAllStakers.js",
+    "masterCoverage": "hardhat coverage --testfiles test/masterTest.js"
   },
   "keywords": [],
   "author": "",

@@ -37,10 +37,6 @@ describe('nftTests', function () {
     var deployer;
     var daofund;
     var devfund;
-    var theoryUnlocker;
-    var theoryUnlockerGen1;
-    var spookySwapFactory;
-    var spookySwapRouter;
     var gToken;
     var startTime;
     const seconds = BigNumber.from(1);
@@ -176,6 +172,61 @@ describe('nftTests', function () {
     });
 
     describe('Master', () => {
-
+        it("setTimes SUCCESS", async () => {
+            await gToken.setTimes(days.mul(366), days.mul(31));
+            expect(await gToken.minLockTime()).to.equal(days.mul(366));
+            expect(await gToken.unlockedClaimPenalty()).to.equal(days.mul(31));
+            await gToken.setTimes(days.mul(730), days.mul(730));
+            expect(await gToken.minLockTime()).to.equal(days.mul(730));
+            expect(await gToken.unlockedClaimPenalty()).to.equal(days.mul(730));
+        });
+        it("setTimes not authorized FAILURE", async () => {
+            await gToken.renounceOwnership();
+            await expect(gToken.setTimes(days.mul(366), days.mul(31))).to.be.revertedWith('caller is not authorized');
+        });
+        it("setTimes lockTime too high FAILURE", async () => {
+            await expect(gToken.setTimes(days.mul(731), days.mul(31))).to.be.revertedWith('Lock time too high.');
+        });
+        it("setTimes penalty too high FAILURE", async () => {
+            await expect(gToken.setTimes(days.mul(366), days.mul(367))).to.be.revertedWith('Penalty too high.');
+        });
+        it("transferToken SUCCESS", async () => {
+            let balances = {};
+            balances[gToken.address] = oneBillion;
+            await gToken.setVariable("_balances", balances);
+            await gToken.setVariable("_totalSupply", oneBillion);
+            await gToken.transferToken(gToken.address, deployer.address, one);
+            expect(await gToken.balanceOf(gToken.address)).to.equal(oneBillion.sub(one));
+            expect(await gToken.balanceOf(deployer.address)).to.equal(one);
+        });
+        it("transferToken not authorized FAILURE", async () => {
+            await gToken.renounceOwnership();
+            await expect(gToken.transferToken(gToken.address, deployer.address, one)).to.be.revertedWith('caller is not authorized');
+        });
+        //MASTER failure will be tested in another test.
+        it("transferToken THEORY FAILURE", async () => {
+            await expect(gToken.transferToken(sToken.address, deployer.address, one)).to.be.revertedWith('Cannot bring down price of MASTER.');
+        });
+        it("stakeExternalTheory SUCCESS", async () => {
+            await sToken.transfer(gToken.address, one);
+            expect(await sToken.balanceOf(gToken.address)).to.equal(one);
+            await gToken.stakeExternalTheory(one);
+            expect(await sToken.balanceOf(gToken.address)).to.equal(zero);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(one);
+            expect(await sToken.balanceOf(deployer.address)).to.equal(zero);
+        });
+        it("stakeExternalTheory not authorized FAILURE", async () => {
+            await gToken.renounceOwnership();
+            await expect(gToken.stakeExternalTheory(one)).to.be.revertedWith('caller is not authorized');
+        });
+        //THEORY failure will be tested in another test.
+        //Transfer will be tested in another test.
+        //gameAvailableToClaim and anyGameAvailableToClaim will be tested in another test.
+        //_claimGame will be tested in another test.
+        //_initiatePart1 will be tested in another test.
+        //_sellToTheory will be tested in another test.
+        it("requestBuyFromTheory SUCCESS", async () => {
+            //TODO
+        });
     });
 });
