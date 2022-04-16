@@ -6,6 +6,8 @@ const { BigNumber } = require('@ethersproject/bignumber');
 const { smock } = require('@defi-wonderland/smock');
 const chai = require('chai');
 var chaiAsPromised = require('chai-as-promised');
+const { solidity } = require("ethereum-waffle");
+chai.use(solidity);
 const hre = require("hardhat");
 const {setTime, advanceTime} = require("./shared/utilities");
 const {getCurrentTimestamp} = require("hardhat/internal/hardhat-network/provider/utils/getCurrentTimestamp");
@@ -15,6 +17,10 @@ chai.use(chaiAsPromised);
 async function latestBlocktime(provider) {
     const { timestamp } = await provider.getBlock('latest');
     return timestamp;
+}
+async function latestBlockNumber(provider) {
+    const { number } = await provider.getBlock('latest');
+    return number;
 }
 //TODO: Check lock
 //TODO: Check lock decay
@@ -86,7 +92,7 @@ describe('nftTests', function () {
         const blockTime = await latestBlocktime(ethers.provider);
         startTime = BigNumber.from(blockTime).add(period);
 
-        const TheoryToken = await hre.ethers.getContractFactory("Theory");
+        const TheoryToken = await smock.mock("Theory");
         // Start unlocking after 365 days, and fully unlock 365 days after that.
         sToken = await TheoryToken.deploy(startTime, daofund.address, devfund.address, startTime.add(years), startTime.add(years.mul(2)));
         await sToken.deployed();
@@ -166,6 +172,9 @@ describe('nftTests', function () {
         console.log("- MasterToken deployed to:", gToken.address);
         console.log("MasterToken decimals:", gTokenDecimals);
 
+        await pToken.addAuthorized(gToken.address);
+        await sToken.connect(daofund).approve(gToken.address, BigNumber.from("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"));
+
         await setTime(ethers.provider, startTime.toNumber());
         //await ethers.provider.send('evm_mine');
         //expect(await pendingBlocktime(ethers.provider)).to.equal(startTime);
@@ -203,7 +212,7 @@ describe('nftTests', function () {
             await gToken.renounceOwnership();
             await expect(gToken.transferToken(gToken.address, deployer.address, one)).to.be.revertedWith('caller is not authorized');
         });
-        //MASTER failure will be tested in another test.
+        //TODO: MASTER failure will be tested in another test.
         it("transferToken THEORY FAILURE", async () => {
             await expect(gToken.transferToken(sToken.address, deployer.address, one)).to.be.revertedWith('Cannot bring down price of MASTER.');
         });
@@ -219,14 +228,105 @@ describe('nftTests', function () {
             await gToken.renounceOwnership();
             await expect(gToken.stakeExternalTheory(one)).to.be.revertedWith('caller is not authorized');
         });
-        //THEORY failure will be tested in another test.
+        //TODO: THEORY failure will be tested in another test.
+
         //Transfer will be tested in another test.
-        //gameAvailableToClaim and anyGameAvailableToClaim will be tested in another test.
-        //_claimGame will be tested in another test.
+        //TODO: earned will be tested in another test.
+        //TODO: _claimGame will be tested in another test.
         //_initiatePart1 will be tested in another test.
-        //_sellToTheory will be tested in another test.
-        it("requestBuyFromTheory SUCCESS", async () => {
-            //TODO
+        //sellToTheory will be tested in another test.
+        it("requests 0 epoch SUCCESS", async () => {
+            let balances = {};
+            balances[deployer.address] = oneBillion;
+            await sToken.setVariable("_balances", balances);
+            await sToken.setVariable("_totalSupply", oneBillion);
+            await gToken.setTimes(days, hours);
+
+            await sToken.approve(gToken.address, one);
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            await gToken.buyFromTheory(one, zero);
+            let user = await gToken.userInfo(deployer.address);
+            let lastLockToTimeDeployer = user.lockToTime;
+            expect(user.lockToTime.gte(startTime.add(days))).to.equal(true);
+            expect(user.chosenLockTime).to.equal(days);
+            expect(user.approveTransferFrom).to.equal("0x0000000000000000000000000000000000000000");
+            expect(user.lastSnapshotIndex).to.equal(0);
+            expect(user.rewardEarned).to.equal(0);
+            expect(user.withdrawRequestedInMaster).to.equal(0);
+            expect(user.withdrawRequestedInTheory).to.equal(0);
+            expect(user.lastStakeRequestBlock).to.not.equal(0);
+            expect(user.lastWithdrawRequestBlock).to.equal(0);
+            expect(await gToken.balanceOf(deployer.address)).to.equal(one);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(one);
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+
+            await sToken.transfer(gToken.address, one.mul(2));
+            await sToken.transfer(devfund.address, one);
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            sToken = sToken.connect(devfund);
+            gToken = gToken.connect(devfund);
+            theoretics = theoretics.connect(devfund);
+
+            await sToken.approve(gToken.address, one);
+            await gToken.buyFromTheory(one, zero);
+            user = await gToken.userInfo(devfund.address);
+            expect(user.lockToTime.gte(startTime.add(days))).to.equal(true);
+            expect(user.chosenLockTime).to.equal(days);
+            expect(user.approveTransferFrom).to.equal("0x0000000000000000000000000000000000000000");
+            expect(user.lastSnapshotIndex).to.equal(0);
+            expect(user.rewardEarned).to.equal(0);
+            expect(user.withdrawRequestedInMaster).to.equal(0);
+            expect(user.withdrawRequestedInTheory).to.equal(0);
+            expect(user.lastStakeRequestBlock).to.not.equal(0);
+            expect(user.lastWithdrawRequestBlock).to.equal(0);
+            expect(await gToken.balanceOf(devfund.address)).to.equal(one);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(one.mul(2));
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+
+            sToken = sToken.connect(deployer);
+            gToken = gToken.connect(deployer);
+            theoretics = theoretics.connect(deployer);
+
+            await gToken.stakeExternalTheory(one.mul(2));
+            expect(await gToken.masterToTheory(one)).to.equal(one.mul(2));
+            expect(await gToken.theoryToMaster(one.mul(2))).to.equal(one);
+
+            await gToken.renounceOwnership();
+            await expect(gToken.transfer(devfund.address, one)).to.be.revertedWith("Receiver did not approve transfer.");
+            await gToken.connect(devfund).approveTransferFrom(deployer.address);
+            let lastLockToTime = user.lockToTime
+            await gToken.transfer(devfund.address, half);
+
+            user = await gToken.userInfo(devfund.address);
+            expect(user.lockToTime.gt(lastLockToTime)).to.equal(true);
+
+            expect(await gToken.balanceOf(deployer.address)).to.equal(half, false);
+
+            await expect(gToken.requestSellToTheory(half, false)).to.be.revertedWith("Still locked!");
+            await advanceTime(ethers.provider, days.toNumber());
+            await gToken.requestSellToTheory(half, false);
+
+            user = await gToken.userInfo(deployer.address);
+            expect(user.lockToTime).to.equal(lastLockToTimeDeployer);
+            expect(user.chosenLockTime).to.equal(days);
+            expect(user.approveTransferFrom).to.equal("0x0000000000000000000000000000000000000000");
+            expect(user.lastSnapshotIndex).to.equal(0);
+            expect(user.rewardEarned).to.equal(0);
+            expect(user.withdrawRequestedInMaster).to.equal(0);
+            expect(user.withdrawRequestedInTheory).to.equal(0);
+            expect(user.lastStakeRequestBlock).to.not.equal(0);
+            expect(user.lastWithdrawRequestBlock).to.not.equal(0);
+
+            expect(await gToken.balanceOf(deployer.address)).to.equal(zero);
+            expect(await sToken.balanceOf(gToken.address)).to.equal(zero);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(one.mul(3));
+            expect(await gToken.masterToTheory(one)).to.equal(one.mul(2));
+            expect(await gToken.theoryToMaster(one.mul(2))).to.equal(one);
+
         });
     });
 });

@@ -21,7 +21,8 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         uint256 lockToTime;
         uint256 chosenLockTime;
         address approveTransferFrom;
-        uint256 lastTotalGameClaimed;
+        uint256 lastSnapshotIndex;
+        uint256 rewardEarned;
         uint256 withdrawRequestedInMaster;
         uint256 withdrawRequestedInTheory;
         uint256 lastStakeRequestBlock;
@@ -29,7 +30,6 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     }
 
     mapping(address => UserInfo) public userInfo;
-    uint256 public totalGameClaimed;
     IERC20Lockable public theory;
     IERC20Lockable public game;
     ITheoretics public theoretics;
@@ -49,6 +49,12 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     uint256 lastInitiatePart2Epoch;
     uint256 lastInitiatePart1Block;
     uint256 lastInitiatePart2Block;
+    struct MasterSnapshot {
+        uint256 time;
+        uint256 rewardReceived;
+        uint256 rewardPerShare;
+    }
+    MasterSnapshot[] public masterHistory;
 
 
     event RewardPaid(address indexed user, uint256 reward, uint256 lockAmount);
@@ -67,6 +73,8 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         treasury = _treasury;
         minLockTime = 365 days;
         unlockedClaimPenalty = 30 days;
+        MasterSnapshot memory genesisSnapshot = MasterSnapshot({time : block.number, rewardReceived : 0, rewardPerShare : 0});
+        masterHistory.push(genesisSnapshot);
     }
 
 
@@ -127,6 +135,44 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         return what;
     }
 
+    //Snapshot
+
+    // =========== Snapshot getters
+
+    function latestSnapshotIndex() public view returns (uint256) {
+        return masterHistory.length.sub(1);
+    }
+
+    function getLatestSnapshot() internal view returns (MasterSnapshot memory) {
+        return masterHistory[latestSnapshotIndex()];
+    }
+
+    function getLastSnapshotIndexOf(address theorist) public view returns (uint256) {
+        return userInfo[theorist].lastSnapshotIndex;
+    }
+
+    function getLastSnapshotOf(address theorist) internal view returns (MasterSnapshot memory) {
+        return masterHistory[getLastSnapshotIndexOf(theorist)];
+    }
+
+    function earned(address theorist) public view returns (uint256) {
+        uint256 latestRPS = getLatestSnapshot().rewardPerShare;
+        uint256 storedRPS = getLastSnapshotOf(theorist).rewardPerShare;
+
+        return balanceOf(theorist).mul(latestRPS.sub(storedRPS)).div(1e18).add(userInfo[theorist].rewardEarned);
+    }
+
+    //Modifiers
+    modifier updateReward(address theorist) {
+        if (theorist != address(0)) {
+            UserInfo memory user = userInfo[theorist];
+            user.rewardEarned = earned(theorist);
+            user.lastSnapshotIndex = latestSnapshotIndex();
+            userInfo[theorist] = user;
+        }
+        _;
+    }
+
     //Admin functions
     function setTimes(uint256 lockTime, uint256 penalty) external onlyAuthorized
     {
@@ -176,6 +222,10 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         userInfo[user].lockToTime = lockTo;
     }
 
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal updateReward(from) updateReward(to) virtual override {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+
     function _transfer(address from, address to, uint256 amount) internal virtual override {
         if(!(authorized[msg.sender] || owner() == msg.sender || treasury.daoFund() == msg.sender || address(this) == msg.sender || authorized[to] || owner() == to || treasury.daoFund() == to || address(this) == to))
         {
@@ -189,57 +239,23 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 
     }
 
-    //Also counting locked. Get lock percentage from theoretics if you want the ratio.
-    function gameAvailableToClaim(address userAddress) public view returns (uint256)
-    {
-        if(balanceOf(userAddress) == 0) return 0;
-        UserInfo storage user = userInfo[userAddress];
-        uint256 totalEarned = totalGameClaimed.sub(user.lastTotalGameClaimed);
-        if (totalEarned == 0) return 0;
-        uint256 supply = totalSupply();
-        if (supply == 0) return 0;
-
-        //Get percentage to transfer
-        uint256 percentage = balanceOf(msg.sender).mul(1 ether).div(supply);
-        //Get amount to transfer
-        uint256 reward = totalEarned.mul(percentage).div(1 ether);
-        return reward;
-    }
-
-    function anyGameAvailableToClaim(address userAddress) public view returns (bool)
-    {
-        if(balanceOf(userAddress) == 0) return false;
-        UserInfo storage user = userInfo[userAddress];
-        uint256 totalEarned = totalGameClaimed.sub(user.lastTotalGameClaimed);
-        if (totalEarned == 0) return false;
-        uint256 supply = totalSupply();
-        if (supply == 0) return false;
-        return true;
-    }
-
     function _claimGame() internal
     {
-        //Act as if everyone has claimed when you did so that you don't get the full pool if you have already claimed, only newly added GAME.
-        UserInfo storage user = userInfo[msg.sender];
-        uint256 totalEarned = totalGameClaimed.sub(user.lastTotalGameClaimed);
-        user.lastTotalGameClaimed = totalGameClaimed;
-
-        //Get percentage to transfer. Include all MASTER that we "own" but have not burned.
-        uint256 percentage = balanceOf(msg.sender).mul(1 ether).div(totalSupply());
-        //Get amount to transfer
-        uint256 reward = totalEarned.mul(percentage).div(1 ether);
-        //Transfer
-        game.transfer(msg.sender, reward);
-        //Relock according to usual lock amount.
-        uint256 lockAmount = 0;
-        uint256 lockPercentage = theoretics.getLockPercentage();
-        require(lockPercentage <= 100, "Invalid lock percentage, check Theoretics contract.");
-        lockAmount = reward.mul(lockPercentage).div(100);
-        if(lockAmount > 0) game.lock(msg.sender, lockAmount);
-        emit RewardPaid(msg.sender, reward, lockAmount);
+        uint256 reward = userInfo[msg.sender].rewardEarned;
+        if (reward > 0) {
+            userInfo[msg.sender].rewardEarned = 0;
+            game.safeTransfer(msg.sender, reward);
+            // GAME can always be locked.
+            uint256 lockAmount = 0;
+            uint256 lockPercentage = theoretics.getLockPercentage();
+            require(lockPercentage <= 100, "Invalid lock percentage, check this contract.");
+            lockAmount = reward.mul(lockPercentage).div(100);
+            if(lockAmount > 0) game.lock(msg.sender, lockAmount);
+            emit RewardPaid(msg.sender, reward, lockAmount);
+        }
     }
 
-    function _initiatePart1() internal
+    function _initiatePart1(bool allowEmergency) internal
     {
         uint256 withdrawEpochs = theoretics.getCurrentWithdrawEpochs();
         //Every getCurrentWithdrawEpochs() epochs
@@ -304,7 +320,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
                 uint256 whatAfterWithdrawFee = newBalanceTheory.sub(initialBalanceTheory);
 
                 uint256 withdrawFee = what.sub(whatAfterWithdrawFee);
-                if(withdrawFee > 0 && theory.allowance(treasury.daoFund(), address(this)) > 0) theory.safeTransferFrom(treasury.daoFund(), address(this), withdrawFee); //Send withdraw fee back to us. Don't allow this function to hold up funds.
+                if(!allowEmergency || withdrawFee > 0 && theory.allowance(treasury.daoFund(), address(this)) >= withdrawFee) theory.safeTransferFrom(treasury.daoFund(), address(this), withdrawFee); //Send withdraw fee back to us. Don't allow this function to hold up funds.
 
     //            if(extraTheoryWithdrawRequested > 0)
     //            {
@@ -319,12 +335,25 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         }
         //theoretics.setLockUp(_withdrawLockupEpochs, _rewardLockupEpochs, _pegMaxUnlock);
         //Unlock
-        game.unlockForUser(address(this), game.lockOf(address(this)));
+        uint256 extraLocked = game.lockOf(address(this)).sub(game.canUnlockAmount(address(this)));
+        if(extraLocked > 0)
+        {
+            game.unlockForUser(address(this), extraLocked);
+        }
         uint256 newBalance = game.totalBalanceOf(address(this));
-        uint256 newGameClaimed = newBalance.sub(initialBalance);
+        uint256 amount = newBalance.sub(initialBalance);
 
         //Calculate amount to earn
-        totalGameClaimed = totalGameClaimed.add(newGameClaimed);
+        // Create & add new snapshot
+        uint256 prevRPS = getLatestSnapshot().rewardPerShare;
+        uint256 nextRPS = prevRPS.add(amount.mul(1e18).div(totalSupply()));
+
+        MasterSnapshot memory newSnapshot = MasterSnapshot({
+        time: block.number,
+        rewardReceived: amount,
+        rewardPerShare: nextRPS
+        });
+        masterHistory.push(newSnapshot);
 
         lastInitiatePart1Epoch = theoretics.epoch();
         lastInitiatePart1Block = block.number;
@@ -350,11 +379,11 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     }
 
     //Public functions
-    function requestBuyFromTheory(uint256 amountInTheory, uint256 lockTime) public onlyOneBlock
+    function buyFromTheory(uint256 amountInTheory, uint256 lockTime) public onlyOneBlock updateReward(msg.sender)
     {
         require(amountInTheory > 0, "No zero amount allowed.");
         UserInfo storage user = userInfo[msg.sender];
-        require(user.withdrawRequestedInMaster == 0 && lastInitiatePart1Block > user.lastWithdrawRequestBlock, "Cannot stake with a withdraw pending.");
+        require(user.withdrawRequestedInMaster == 0 && (lastInitiatePart1Block == 0 || lastInitiatePart1Block > user.lastWithdrawRequestBlock), "Cannot stake with a withdraw pending.");
 
         //Lock
         if(lockTime < minLockTime) lockTime = minLockTime;
@@ -364,7 +393,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         user.chosenLockTime = lockTime;
         if(nextTime > user.lockToTime) _lock(msg.sender, nextTime);
 
-        //Mint (delayed)
+        //Mint
         uint256 what = theoryToMaster(amountInTheory);
         theory.safeTransferFrom(msg.sender, address(this), amountInTheory);
 
@@ -384,12 +413,12 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         emit Deposit(msg.sender, amountInTheory, what);
     }
 
-    function requestSellToTheory(uint256 amountInMaster) public onlyOneBlock
+    function requestSellToTheory(uint256 amountInMaster, bool allowEmergency) public onlyOneBlock updateReward(msg.sender)
     {
         UserInfo storage user = userInfo[msg.sender];
         require(block.timestamp >= user.lockToTime, "Still locked!");
         require(amountInMaster > 0, "No zero amount allowed.");
-        require(lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
+        require(lastInitiatePart2Block == 0 || lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
 
         if(amountInMaster == balanceOf(msg.sender)) _claimGame(); //Final GAME claim before moving to THEORY.
 
@@ -409,20 +438,20 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         emit WithdrawRequest(msg.sender, amountInMaster, what);
         if(theoretics.getCurrentWithdrawEpochs() == 0)
         {
-            _initiatePart1();
+            _initiatePart1(allowEmergency);
             _sellToTheory();
         }
     }
 
-    function sellToTheory() public onlyOneBlock
+    function sellToTheory() public onlyOneBlock updateReward(msg.sender)
     {
         require(theoretics.getCurrentWithdrawEpochs() != 0, "Call requestSellToTheory instead.");
         _sellToTheory();
     }
 
-    function claimGame() public onlyOneBlock
+    function claimGame() public onlyOneBlock updateReward(msg.sender)
     {
-        require(anyGameAvailableToClaim(msg.sender), "No GAME to claim.");
+        require(earned(msg.sender) > 0, "No GAME to claim."); //Avoid locking yourself for nothing.
         //If you claim GAME after your lock time is over, you are locked up for 30 more days by default.
         UserInfo storage user = userInfo[msg.sender];
         if(block.timestamp >= user.lockToTime)
@@ -432,9 +461,9 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         _claimGame();
     }
 
-    function initiatePart1() public onlyOneBlock
+    function initiatePart1(bool allowEmergency) public onlyOneBlock
     {
-       _initiatePart1();
+       _initiatePart1(allowEmergency);
     }
 
     function initiatePart2() public onlyOneBlock
@@ -447,7 +476,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         //No calling twice within the epoch.
         require(withdrawEpochs == 0 || lastInitiatePart2Epoch != theoretics.epoch(), "Already called.");
         //No calling before part 1.
-        require(theoretics.getCurrentWithdrawEpochs() == 0 || lastInitiatePart1Epoch == theoretics.epoch(), "Initiate part 1 first.");
+        require(withdrawEpochs == 0 || lastInitiatePart1Epoch == theoretics.epoch(), "Initiate part 1 first.");
         if(totalStakeRequestedInTheory > 0)
         {
             theory.safeApprove(address(theoretics), 0);
@@ -459,5 +488,10 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         }
         lastInitiatePart2Epoch = theoretics.epoch();
         lastInitiatePart2Block = block.number;
+    }
+
+    function approveTransferFrom(address from) public
+    {
+        userInfo[msg.sender].approveTransferFrom = from;
     }
 }
