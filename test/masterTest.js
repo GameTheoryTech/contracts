@@ -327,6 +327,43 @@ describe('nftTests', function () {
             expect(await gToken.masterToTheory(one)).to.equal(one.mul(2));
             expect(await gToken.theoryToMaster(one.mul(2))).to.equal(one);
 
+            await gToken.connect(devfund).requestSellToTheory(one.add(half), false);
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+
+        });
+        it("requests 6 epoch SUCCESS", async () => {
+            let balances = {};
+            balances[deployer.address] = oneBillion;
+            await sToken.setVariable("_balances", balances);
+            await sToken.setVariable("_totalSupply", oneBillion);
+
+            await advanceTime(ethers.provider, years.toNumber());
+
+            await sToken.approve(gToken.address, one);
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            await gToken.buyFromTheory(one, zero);
+            let user = await gToken.userInfo(deployer.address);
+            expect(user.lockToTime.gte(startTime.add(years))).to.equal(true);
+            expect(user.chosenLockTime).to.equal(years);
+            expect(user.approveTransferFrom).to.equal("0x0000000000000000000000000000000000000000");
+            expect(user.lastSnapshotIndex).to.equal(0);
+            expect(user.rewardEarned).to.equal(0);
+            expect(user.withdrawRequestedInMaster).to.equal(0);
+            expect(user.withdrawRequestedInTheory).to.equal(0);
+            expect(user.lastStakeRequestBlock).to.not.equal(0);
+            expect(user.lastWithdrawRequestBlock).to.equal(0);
+            expect(await gToken.balanceOf(deployer.address)).to.equal(one);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(one);
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            expect(await gToken.totalStakeRequestedInTheory()).to.equal(one);
+
+            //TODO: Test when THEORY is added after each request
+            //TODO: Test claim
+            //TODO: Test stakeExternalTheory and transferToken (MASTER) failures
+
         });
     });
 });

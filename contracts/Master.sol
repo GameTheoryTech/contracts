@@ -261,7 +261,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         //Every getCurrentWithdrawEpochs() epochs
         require(withdrawEpochs == 0 || theoretics.epoch().mod(withdrawEpochs) == 0, "Must call at a withdraw epoch.");
         //Only in last 30 minutes of the epoch.
-        require(withdrawEpochs == 0 || theoretics.nextEpochPoint().sub(block.timestamp) <= 30 minutes, "Must be called 30 minutes before epoch ends.");
+        require(withdrawEpochs == 0 || block.timestamp > theoretics.nextEpochPoint() || theoretics.nextEpochPoint().sub(block.timestamp) <= 30 minutes, "Must be called at most 30 minutes before epoch ends.");
         //No calling twice within the epoch.
         require(withdrawEpochs == 0 || lastInitiatePart1Epoch != theoretics.epoch(), "Already called.");
         //Unlock all LGAME, transfer GAME, then relock at normal rate.
@@ -346,7 +346,14 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         //Calculate amount to earn
         // Create & add new snapshot
         uint256 prevRPS = getLatestSnapshot().rewardPerShare;
-        uint256 nextRPS = prevRPS.add(amount.mul(1e18).div(totalSupply()));
+        uint256 supply = totalSupply();
+        //Nobody earns any GAME if everyone withdraws. If that's the case, all GAME goes to the treasury's daoFund.
+        uint256 nextRPS = supply == 0 ? prevRPS : prevRPS.add(amount.mul(1e18).div(supply)); //Otherwise, GAME is distributed amongst those who have not yet burned their MASTER.
+
+        if(supply == 0)
+        {
+            game.transfer(treasury.daoFund(), amount);
+        }
 
         MasterSnapshot memory newSnapshot = MasterSnapshot({
         time: block.number,
@@ -472,7 +479,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         //Every getCurrentWithdrawEpochs() epochs
         require(withdrawEpochs == 0 || theoretics.epoch().mod(withdrawEpochs) == 0, "Must call at a withdraw epoch.");
         //Only in last 30 minutes of the epoch.
-        require(withdrawEpochs == 0 || theoretics.nextEpochPoint().sub(block.timestamp) <= 30 minutes, "Must be called 30 minutes before epoch ends.");
+        require(withdrawEpochs == 0 || block.timestamp > theoretics.nextEpochPoint() || theoretics.nextEpochPoint().sub(block.timestamp) <= 30 minutes, "Must be called at most 30 minutes before epoch ends.");
         //No calling twice within the epoch.
         require(withdrawEpochs == 0 || lastInitiatePart2Epoch != theoretics.epoch(), "Already called.");
         //No calling before part 1.
