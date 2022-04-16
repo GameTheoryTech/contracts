@@ -338,7 +338,15 @@ describe('nftTests', function () {
             await sToken.setVariable("_balances", balances);
             await sToken.setVariable("_totalSupply", oneBillion);
 
+            await sToken.approve(theoretics.address, half);
             await advanceTime(ethers.provider, years.toNumber());
+            await theoretics.stake(half);
+
+            await treasuryDAO.allocateSeigniorage();
+
+            let blockTime = BigNumber.from(await latestBlocktime(ethers.provider));
+            expect(await theoryRewardPool.getLockPercentage(blockTime.sub(1), blockTime)).to.equal(zero);
+            expect(await theoretics.getCurrentWithdrawEpochs()).to.equal(6);
 
             await sToken.approve(gToken.address, one);
             expect(await gToken.masterToTheory(one)).to.equal(one);
@@ -354,15 +362,20 @@ describe('nftTests', function () {
             expect(user.withdrawRequestedInTheory).to.equal(0);
             expect(user.lastStakeRequestBlock).to.not.equal(0);
             expect(user.lastWithdrawRequestBlock).to.equal(0);
+
             expect(await gToken.balanceOf(deployer.address)).to.equal(one);
-            expect(await theoretics.balanceOf(gToken.address)).to.equal(one);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(zero);
+            expect(await theoretics.totalSupply()).to.equal(half);
             expect(await gToken.masterToTheory(one)).to.equal(one);
             expect(await gToken.theoryToMaster(one)).to.equal(one);
             expect(await gToken.totalStakeRequestedInTheory()).to.equal(one);
 
+            //TODO: Sell request
             //TODO: Test when THEORY is added after each request
-            //TODO: Test claim
+            //TODO: Test claim/distribution
             //TODO: Test stakeExternalTheory and transferToken (MASTER) failures
+            //TODO: Test one person trying to withdraw and stake at the same time
+            //TODO: Test multiple people withdrawing and staking at the same time
 
         });
     });
