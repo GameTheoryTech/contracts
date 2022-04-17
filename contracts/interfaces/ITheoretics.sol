@@ -42,4 +42,10 @@ interface ITheoretics {
     function getLockPercentage() external view returns (uint256);
 
     function totalSupply() external view returns (uint256);
+
+    function getLatestSnapshot() external view returns (uint256 time, uint256 rewardReceived, uint256 rewardPerShare);
+
+    function latestSnapshotIndex() external view returns (uint256);
+
+    function theoreticsHistory(uint256 index) external view returns (uint256 time, uint256 rewardReceived, uint256 rewardPerShare);
 }

@@ -162,6 +162,13 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         return balanceOf(theorist).mul(latestRPS.sub(storedRPS)).div(1e18).add(userInfo[theorist].rewardEarned);
     }
 
+    function expectedClaimableGameThisEpoch() public view returns (uint256) {
+        (, , uint256 latestRPS) = theoretics.getLatestSnapshot();
+        (, , uint256 storedRPS) = theoretics.theoreticsHistory(theoretics.latestSnapshotIndex().sub(1));
+
+        return theoretics.balanceOf(address(this)).mul(latestRPS.sub(storedRPS)).div(1e18);
+    }
+
     //Modifiers
     modifier updateReward(address theorist) {
         if (theorist != address(0)) {
@@ -186,7 +193,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     function transferToken(IERC20 _token, address to, uint256 amount) external onlyAuthorized onlyOneBlock {
         //Required in order move MASTER and other tokens if they get stuck in the contract.
         //Some security measures in place for MASTER and THEORY.
-        require(address(_token) != address(this) || amount <= balanceOf(address(this)).sub(totalWithdrawRequestedInMaster));
+        require(address(_token) != address(this) || amount <= balanceOf(address(this)).sub(totalWithdrawRequestedInMaster), "Cannot transfer more than accidental funds.");
         //require(address(_token) != address(theory) || amount <= theory.balanceOf(address(this)).sub(totalStakeRequested.add(totalWithdrawUnclaimed)), "Cannot withdraw pending funds."); //To prevent a number of issues that crop up when extra THEORY is removed, this function as been disabled. THEORY sent here is essentially donated to MASTER if staked. Otherwise, it is out of circulation.
         require(address(_token) != address(theory), "Cannot bring down price of MASTER.");
         _token.safeTransfer(to, amount);
@@ -314,7 +321,6 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
             if(what > 0)
             {
                 theoretics.withdraw(what);
-                totalWithdrawUnclaimedInTheory = totalWithdrawUnclaimedInTheory.add(what);
 
                 uint256 newBalanceTheory = theory.balanceOf(address(this));
                 uint256 whatAfterWithdrawFee = newBalanceTheory.sub(initialBalanceTheory);
@@ -369,7 +375,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     function _sellToTheory() internal
     {
         UserInfo storage user = userInfo[msg.sender];
-        require(block.timestamp >= user.lockToTime, "Still locked!");
+        //require(block.timestamp >= user.lockToTime, "Still locked!"); //Allow locked people to withdraw since it no longer counts towards their rewards.
         require(user.withdrawRequestedInMaster > 0, "No zero amount allowed.");
         require(theoretics.getCurrentWithdrawEpochs() == 0 || lastInitiatePart1Block > user.lastWithdrawRequestBlock, "Initiator Part 1 not yet called or called too soon.");
 
@@ -390,7 +396,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     {
         require(amountInTheory > 0, "No zero amount allowed.");
         UserInfo storage user = userInfo[msg.sender];
-        require(user.withdrawRequestedInMaster == 0 && (lastInitiatePart1Block == 0 || lastInitiatePart1Block > user.lastWithdrawRequestBlock), "Cannot stake with a withdraw pending.");
+        require(user.withdrawRequestedInMaster == 0 && (theoretics.getCurrentWithdrawEpochs() == 0 || user.lastWithdrawRequestBlock == 0 || lastInitiatePart1Block > user.lastWithdrawRequestBlock), "Cannot stake with a withdraw pending.");
 
         //Lock
         if(lockTime < minLockTime) lockTime = minLockTime;
@@ -425,7 +431,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         UserInfo storage user = userInfo[msg.sender];
         require(block.timestamp >= user.lockToTime, "Still locked!");
         require(amountInMaster > 0, "No zero amount allowed.");
-        require(lastInitiatePart2Block == 0 || lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
+        require(theoretics.getCurrentWithdrawEpochs() == 0 || user.lastStakeRequestBlock == 0 || lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
 
         if(amountInMaster == balanceOf(msg.sender)) _claimGame(); //Final GAME claim before moving to THEORY.
 
@@ -440,6 +446,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 
         user.withdrawRequestedInTheory = user.withdrawRequestedInTheory.add(what);
         totalWithdrawRequestedInTheory = totalWithdrawRequestedInTheory.add(what);
+        totalWithdrawUnclaimedInTheory = totalWithdrawUnclaimedInTheory.add(what);
 
         user.lastWithdrawRequestBlock = block.number;
         emit WithdrawRequest(msg.sender, amountInMaster, what);

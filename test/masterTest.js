@@ -308,6 +308,7 @@ describe('nftTests', function () {
 
             await expect(gToken.requestSellToTheory(half, false)).to.be.revertedWith("Still locked!");
             await advanceTime(ethers.provider, days.toNumber());
+            expect(gToken.sellToTheory()).to.be.revertedWith("Call requestSellToTheory instead.")
             await gToken.requestSellToTheory(half, false);
 
             user = await gToken.userInfo(deployer.address);
@@ -363,19 +364,161 @@ describe('nftTests', function () {
             expect(user.lastStakeRequestBlock).to.not.equal(0);
             expect(user.lastWithdrawRequestBlock).to.equal(0);
 
+            expect(await sToken.balanceOf(deployer.address)).to.equal(oneBillion.sub(half).sub(one));
             expect(await gToken.balanceOf(deployer.address)).to.equal(one);
             expect(await theoretics.balanceOf(gToken.address)).to.equal(zero);
             expect(await theoretics.totalSupply()).to.equal(half);
             expect(await gToken.masterToTheory(one)).to.equal(one);
             expect(await gToken.theoryToMaster(one)).to.equal(one);
             expect(await gToken.totalStakeRequestedInTheory()).to.equal(one);
+            expect(await sToken.balanceOf(gToken.address)).to.equal(one);
 
-            //TODO: Sell request
-            //TODO: Test when THEORY is added after each request
-            //TODO: Test claim/distribution
-            //TODO: Test stakeExternalTheory and transferToken (MASTER) failures
-            //TODO: Test one person trying to withdraw and stake at the same time
-            //TODO: Test multiple people withdrawing and staking at the same time
+            //stakeExternalTheory FAILURE
+            await expect(gToken.stakeExternalTheory(one)).to.be.revertedWith("Cannot stake pending funds.");
+
+            //Sell request
+            await expect(gToken.requestSellToTheory(one, false)).to.be.revertedWith("Still locked!");
+
+            await advanceTime(ethers.provider, years.toNumber());
+            await expect(gToken.requestSellToTheory(zero, false)).to.be.revertedWith("No zero amount allowed.");
+            await expect(gToken.sellToTheory()).to.be.revertedWith("No zero amount allowed.");
+            await expect(gToken.requestSellToTheory(one, false)).to.be.revertedWith("Cannot withdraw with a stake pending.");
+
+            await expect(gToken.initiatePart1(false)).to.be.revertedWith("Must call at a withdraw epoch.");
+            await expect(gToken.initiatePart2()).to.be.revertedWith("Must call at a withdraw epoch.");
+
+            while(!((await theoretics.epoch()).eq(6))) await treasuryDAO.allocateSeigniorage();
+
+            await expect(gToken.initiatePart2()).to.be.revertedWith("Initiate part 1 first.");
+            await gToken.initiatePart1(false);
+            expect(await sToken.balanceOf(deployer.address)).to.equal(oneBillion.sub(half).sub(one));
+            expect(await gToken.balanceOf(deployer.address)).to.equal(one);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(zero);
+            expect(await theoretics.totalSupply()).to.equal(half);
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            expect(await gToken.totalStakeRequestedInTheory()).to.equal(one);
+            expect(await sToken.balanceOf(gToken.address)).to.equal(one);
+
+            await gToken.initiatePart2();
+            expect(await sToken.balanceOf(deployer.address)).to.equal(oneBillion.sub(half).sub(one));
+            expect(await gToken.balanceOf(deployer.address)).to.equal(one);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(one);
+            expect(await theoretics.totalSupply()).to.equal(half.add(one));
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            expect(await gToken.totalStakeRequestedInTheory()).to.equal(zero);
+            expect(await sToken.balanceOf(gToken.address)).to.equal(zero);
+
+            await gToken.requestSellToTheory(one, false);
+            expect(await sToken.balanceOf(deployer.address)).to.equal(oneBillion.sub(half).sub(one));
+            expect(await gToken.balanceOf(deployer.address)).to.equal(zero);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(one);
+            expect(await theoretics.totalSupply()).to.equal(half.add(one));
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            expect(await gToken.totalStakeRequestedInTheory()).to.equal(zero);
+            expect(await sToken.balanceOf(gToken.address)).to.equal(zero);
+            expect(await gToken.totalWithdrawRequestedInMaster()).to.equal(one);
+            expect(await gToken.balanceOf(gToken.address)).to.equal(one);
+
+            user = await gToken.userInfo(deployer.address);
+            expect(user.lockToTime.gte(startTime.add(years))).to.equal(true);
+            expect(user.chosenLockTime).to.equal(years);
+            expect(user.approveTransferFrom).to.equal("0x0000000000000000000000000000000000000000");
+            expect(user.lastSnapshotIndex).to.equal(1);
+            expect(user.rewardEarned).to.equal(0);
+            expect(user.withdrawRequestedInMaster).to.equal(one);
+            expect(user.withdrawRequestedInTheory).to.equal(one);
+            expect(user.lastStakeRequestBlock).to.not.equal(0);
+            expect(user.lastWithdrawRequestBlock).to.not.equal(0);
+
+            await expect(gToken.initiatePart1(false)).to.be.revertedWith("Already called.");
+            await expect(gToken.initiatePart2()).to.be.revertedWith("Already called.");
+
+            await expect(gToken.transferToken(gToken.address, deployer.address, one)).to.be.revertedWith("Cannot transfer more than accidental funds.");
+
+            while(!((await theoretics.epoch()).eq(12))) await treasuryDAO.allocateSeigniorage();
+
+            await theoretics.exit();
+            await sToken.transfer(devfund.address, one);
+
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            expect(await sToken.balanceOf(devfund.address)).to.equal(one);
+
+            sToken = sToken.connect(devfund);
+            gToken = gToken.connect(devfund);
+            theoretics = theoretics.connect(devfund);
+
+            await sToken.approve(gToken.address, one);
+            await gToken.buyFromTheory(one, zero);
+
+            expect(await sToken.balanceOf(deployer.address)).to.equal("999999997999950000000000000");
+            expect(await sToken.balanceOf(devfund.address)).to.equal(zero);
+            expect(await gToken.balanceOf(devfund.address)).to.equal(one);
+            expect(await theoretics.balanceOf(gToken.address)).to.equal(one);
+            expect(await theoretics.totalSupply()).to.equal(one);
+            expect(await gToken.masterToTheory(one)).to.equal(one);
+            expect(await gToken.theoryToMaster(one)).to.equal(one);
+            expect(await gToken.totalStakeRequestedInTheory()).to.equal(one);
+            expect(await sToken.balanceOf(gToken.address)).to.equal(one);
+            expect(await gToken.totalWithdrawRequestedInMaster()).to.equal(one);
+
+            user = await gToken.userInfo(devfund.address);
+            expect(user.lockToTime.gte(startTime.add(years))).to.equal(true);
+            expect(user.chosenLockTime).to.equal(years);
+            expect(user.approveTransferFrom).to.equal("0x0000000000000000000000000000000000000000");
+            expect(user.lastSnapshotIndex).to.equal(1);
+            expect(user.rewardEarned).to.equal(0);
+            expect(user.withdrawRequestedInMaster).to.equal(0);
+            expect(user.withdrawRequestedInTheory).to.equal(0);
+            expect(user.lastStakeRequestBlock).to.not.equal(0);
+            expect(user.lastWithdrawRequestBlock).to.equal(0);
+
+            sToken = sToken.connect(deployer);
+            gToken = gToken.connect(deployer);
+            theoretics = theoretics.connect(deployer);
+
+            await gToken.initiatePart1(false);
+
+            await gToken.initiatePart2();
+
+            await sToken.transfer(gToken.address, one);
+            await gToken.stakeExternalTheory(one);
+
+            let previousBalance = await sToken.balanceOf(deployer.address);
+            await gToken.sellToTheory();
+            expect(await sToken.balanceOf(deployer.address)).to.equal(previousBalance.add(one));
+
+            expect(await gToken.masterToTheory(one)).to.equal(one.add(one));
+
+            sToken = sToken.connect(devfund);
+            gToken = gToken.connect(devfund);
+            theoretics = theoretics.connect(devfund);
+
+
+            //Sell fully
+            await advanceTime(ethers.provider, years.toNumber());
+            await gToken.requestSellToTheory(one, false);
+
+            while(!((await theoretics.epoch()).eq(18))) await treasuryDAO.allocateSeigniorage();
+
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            await gToken.sellToTheory();
+            expect(await sToken.balanceOf(devfund.address)).to.equal(one.add(one));
+            expect(await gToken.masterToTheory(one)).to.equal(one)
+
+            //DONE: Test extra THEORY
+            //TODO: Test >= 30 minutes
+            //TODO: Test <= 30 minutes, and > 0 minutes
+            //TODO: Test claim/distribution.  Make sure GAME gotten is the same as Theoretics when 1 to 1, and make sure GAME gotten is larger when not 1 to 1. Also make sure the GAME is split properly between MASTER holders.
+            //TODO: Double check and make sure _beforeTokenTransfer calls updateReward (check lastSnapshotIndex).
+            //DONE: Test stakeExternalTheory and transferToken (MASTER) failures
+            //DONE: Test one person trying to withdraw and stake at the same time
+            //DONE: Test multiple people withdrawing and staking at the same time
 
         });
     });
