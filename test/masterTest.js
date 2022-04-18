@@ -212,7 +212,7 @@ describe('nftTests', function () {
             await gToken.renounceOwnership();
             await expect(gToken.transferToken(gToken.address, deployer.address, one)).to.be.revertedWith('caller is not authorized');
         });
-        //TODO: MASTER failure will be tested in another test.
+        //MASTER failure will be tested in another test.
         it("transferToken THEORY FAILURE", async () => {
             await expect(gToken.transferToken(sToken.address, deployer.address, one)).to.be.revertedWith('Cannot bring down price of MASTER.');
         });
@@ -228,11 +228,11 @@ describe('nftTests', function () {
             await gToken.renounceOwnership();
             await expect(gToken.stakeExternalTheory(one)).to.be.revertedWith('caller is not authorized');
         });
-        //TODO: THEORY failure will be tested in another test.
+        //THEORY failure will be tested in another test.
 
         //Transfer will be tested in another test.
-        //TODO: earned will be tested in another test.
-        //TODO: _claimGame will be tested in another test.
+        //earned will be tested in another test.
+        //_claimGame will be tested in another test.
         //_initiatePart1 will be tested in another test.
         //sellToTheory will be tested in another test.
         it("requests 0 epoch SUCCESS", async () => {
@@ -241,6 +241,7 @@ describe('nftTests', function () {
             await sToken.setVariable("_balances", balances);
             await sToken.setVariable("_totalSupply", oneBillion);
             await gToken.setTimes(days, hours);
+            await expect(gToken.claimGame()).to.be.revertedWith("No GAME to claim.");
 
             await sToken.approve(gToken.address, one);
             expect(await gToken.masterToTheory(one)).to.equal(one);
@@ -512,13 +513,203 @@ describe('nftTests', function () {
             expect(await gToken.masterToTheory(one)).to.equal(one)
 
             //DONE: Test extra THEORY
-            //TODO: Test >= 30 minutes
-            //TODO: Test <= 30 minutes, and > 0 minutes
-            //TODO: Test claim/distribution.  Make sure GAME gotten is the same as Theoretics when 1 to 1, and make sure GAME gotten is larger when not 1 to 1. Also make sure the GAME is split properly between MASTER holders.
-            //TODO: Double check and make sure _beforeTokenTransfer calls updateReward (check lastSnapshotIndex).
+            //DONE: Test initiate >= 30 minutes
+            //DONE: Test initiate <= 30 minutes, and > 0 minutes
+            //DONE: Test claim/distribution.  Make sure GAME gotten is the same as Theoretics when 1 to 1, and make sure GAME gotten is larger when not 1 to 1. Also make sure the GAME is split properly between MASTER holders.
+            //DONE: Double check and make sure _beforeTokenTransfer calls updateReward (check lastSnapshotIndex).
             //DONE: Test stakeExternalTheory and transferToken (MASTER) failures
             //DONE: Test one person trying to withdraw and stake at the same time
             //DONE: Test multiple people withdrawing and staking at the same time
+
+        });
+
+        it("claim 1 to 1, 6 epoch SUCCESS", async () => {
+            let balances = {};
+            balances[deployer.address] = oneBillion;
+            await sToken.setVariable("_balances", balances);
+            await sToken.setVariable("_totalSupply", oneBillion);
+
+            await sToken.approve(theoretics.address, one);
+            await theoretics.stake(one);
+            await sToken.approve(gToken.address, one);
+            await gToken.buyFromTheory(one, zero);
+            expect(await theoretics.totalSupply()).to.equal(one.mul(2));
+
+            await advanceTime(ethers.provider, hours.mul(6).toNumber());
+
+            await treasuryDAO.allocateSeigniorage();
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            await expect(await gToken.earned(deployer.address)).to.equal(await theoretics.earned(deployer.address));
+
+            await advanceTime(ethers.provider, hours.mul(6).toNumber());
+
+            await treasuryDAO.allocateSeigniorage();
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            await expect(await gToken.earned(deployer.address)).to.equal(await theoretics.earned(deployer.address));
+            await expect(await gToken.earned(deployer.address)).to.not.equal(zero);
+
+        });
+        it("claim 2 to 1, 6 epoch SUCCESS", async () => {
+            let balances = {};
+            balances[deployer.address] = oneBillion;
+            await sToken.setVariable("_balances", balances);
+            await sToken.setVariable("_totalSupply", oneBillion);
+
+            await sToken.approve(theoretics.address, one);
+            await theoretics.stake(one);
+            await sToken.approve(gToken.address, one);
+            await gToken.buyFromTheory(one, zero);
+            await sToken.transfer(gToken.address, one);
+            await gToken.stakeExternalTheory(one);
+            expect(await theoretics.totalSupply()).to.equal(one.mul(3));
+
+            await advanceTime(ethers.provider, hours.mul(6).toNumber());
+
+            await treasuryDAO.allocateSeigniorage();
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            await expect(await gToken.earned(deployer.address)).to.equal((await theoretics.earned(deployer.address)).mul(2));
+
+            await advanceTime(ethers.provider, hours.mul(6).toNumber());
+
+            await treasuryDAO.allocateSeigniorage();
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            await expect(await gToken.earned(deployer.address)).to.equal((await theoretics.earned(deployer.address)).mul(2));
+            await expect(await gToken.earned(deployer.address)).to.not.equal(zero);
+
+        });
+
+        it("claim 1 to 1, split, 6 epoch SUCCESS", async () => {
+            let balances = {};
+            balances[deployer.address] = oneBillion;
+            await sToken.setVariable("_balances", balances);
+            await sToken.setVariable("_totalSupply", oneBillion);
+
+            await sToken.transfer(devfund.address, one);
+            await sToken.approve(theoretics.address, one);
+            await theoretics.stake(one);
+            await sToken.approve(gToken.address, one);
+            await gToken.buyFromTheory(one, zero);
+            await sToken.connect(devfund).approve(gToken.address, one);
+            await gToken.connect(devfund).buyFromTheory(one, zero);
+            expect(await theoretics.totalSupply()).to.equal(one.mul(3));
+
+            await advanceTime(ethers.provider, hours.mul(6).toNumber());
+
+            await treasuryDAO.allocateSeigniorage();
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            await expect(await gToken.earned(deployer.address)).to.equal(await theoretics.earned(deployer.address));
+            await expect(await gToken.earned(devfund.address)).to.equal(await theoretics.earned(deployer.address));
+
+            await advanceTime(ethers.provider, hours.mul(6).toNumber());
+
+            await treasuryDAO.allocateSeigniorage();
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            let tokenOwed = await gToken.earned(deployer.address);
+            await expect(tokenOwed).to.equal(await theoretics.earned(deployer.address));
+            await expect(await gToken.earned(devfund.address)).to.equal(await theoretics.earned(deployer.address));
+            await expect(await gToken.earned(deployer.address)).to.not.equal(zero);
+
+            await gToken.claimGame();
+            expect(await pToken.totalBalanceOf(deployer.address)).to.equal(tokenOwed.add(one));
+            expect(await pToken.lockOf(deployer.address)).to.equal(tokenOwed.mul(95).div(100));
+            expect(await pToken.balanceOf(deployer.address)).to.equal(tokenOwed.add(one).sub(tokenOwed.mul(95).div(100)));
+            expect(await gToken.earned(deployer.address)).to.equal(zero);
+        });
+
+        it("initiate timing SUCCESS", async () => {
+            let balances = {};
+            balances[deployer.address] = oneBillion;
+            await sToken.setVariable("_balances", balances);
+            await sToken.setVariable("_totalSupply", oneBillion);
+
+            await sToken.approve(theoretics.address, one);
+            await theoretics.stake(one);
+            await sToken.approve(gToken.address, one);
+            await gToken.buyFromTheory(one, zero);
+            expect(await theoretics.totalSupply()).to.equal(one.mul(2));
+
+            await theoryRewardPool.lockUpdate([0])
+
+            await treasuryDAO.allocateSeigniorage();
+
+            let currentTime = BigNumber.from(await latestBlocktime(ethers.provider));
+            expect(await theoryRewardPool.getLockPercentage(currentTime.sub(1), currentTime)).to.equal(zero);
+            expect(await theoretics.getCurrentWithdrawEpochs()).to.equal(6);
+
+            while(!((await theoretics.epoch()).eq(6)))
+            {
+                await advanceTime(ethers.provider, hours.mul(6).toNumber());
+                await treasuryDAO.allocateSeigniorage();
+            }
+
+            await expect(gToken.initiatePart1(false)).to.be.revertedWith("Must be called at most 30 minutes before epoch ends.");
+            await expect(gToken.initiatePart2()).to.be.revertedWith("Must be called at most 30 minutes before epoch ends.");
+
+            await advanceTime(ethers.provider, hours.mul(5).add(minutes.mul(30)).toNumber());
+
+            await gToken.initiatePart1(true);
+            await gToken.initiatePart2();
+        });
+
+        it("claim 1 to 1, check transfer, 6 epoch SUCCESS", async () => {
+            let balances = {};
+            balances[deployer.address] = oneBillion;
+            await sToken.setVariable("_balances", balances);
+            await sToken.setVariable("_totalSupply", oneBillion);
+
+            await sToken.approve(theoretics.address, one);
+            await theoretics.stake(one);
+            await sToken.approve(gToken.address, one);
+            await gToken.buyFromTheory(one, zero);
+            expect(await theoretics.totalSupply()).to.equal(one.mul(2));
+
+            await advanceTime(ethers.provider, hours.mul(6).toNumber());
+
+            await treasuryDAO.allocateSeigniorage();
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            await expect(await gToken.earned(deployer.address)).to.equal(await theoretics.earned(deployer.address));
+
+            await advanceTime(ethers.provider, hours.mul(6).toNumber());
+
+            await treasuryDAO.allocateSeigniorage();
+            await gToken.initiatePart1(false);
+            await gToken.initiatePart2();
+
+            await expect(await gToken.earned(deployer.address)).to.equal(await theoretics.earned(deployer.address));
+            await expect(await gToken.earned(deployer.address)).to.not.equal(zero);
+
+            let user = await gToken.userInfo(deployer.address);
+            expect(user.lastSnapshotIndex).to.equal(0);
+
+            gToken.transfer(devfund.address, one);
+            user = await gToken.userInfo(deployer.address);
+            expect(user.lastSnapshotIndex).to.equal(2);
+
+            let tokenOwed = await gToken.earned(deployer.address);
+            await expect(tokenOwed).to.equal(await theoretics.earned(deployer.address));
+            await expect(await gToken.earned(deployer.address)).to.not.equal(zero);
+
+            await gToken.claimGame();
+            expect(await pToken.totalBalanceOf(deployer.address)).to.equal(tokenOwed.add(one));
+            expect(await pToken.lockOf(deployer.address)).to.equal(tokenOwed.mul(95).div(100));
+            expect(await pToken.balanceOf(deployer.address)).to.equal(tokenOwed.add(one).sub(tokenOwed.mul(95).div(100)));
+            expect(await gToken.earned(deployer.address)).to.equal(zero);
+
+            await expect(gToken.connect(devfund).claimGame()).to.be.revertedWith("No GAME to claim.");
 
         });
     });

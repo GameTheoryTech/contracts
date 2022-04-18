@@ -15,6 +15,7 @@
     "deployNftsTest": "hardhat run --network fantomtest scripts/deployNftsTest.js",
     "deployZapTest": "hardhat run --network fantomtest scripts/deployZapTest.js",
     "addPoolsTest": "hardhat run --network fantomtest scripts/addPoolsTest.js",
+    "mintAllColorsTest": "hardhat run --network fantomtest scripts/mintAllColorsTest.js",
     "verify": "hardhat run --network fantom scripts/verify.js",
     "verifyNfts": "hardhat run --network fantom scripts/verifyNfts.js",
     "verifyZap": "hardhat run --network fantom scripts/verifyZap.js",
