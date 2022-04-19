@@ -45,6 +45,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     uint256 public totalWithdrawRequestedInTheory;
     uint256 public totalWithdrawRequestedInMaster;
     uint256 public totalWithdrawUnclaimedInTheory;
+    uint256 public totalGameUnclaimed;
     uint256 public lastInitiatePart1Epoch;
     uint256 public lastInitiatePart2Epoch;
     uint256 public lastInitiatePart1Block;
@@ -190,12 +191,32 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         unlockedClaimPenalty = penalty;
     }
 
+    //Not required as no payable function.
+//    function transferFTM(address payable to, uint256 amount) external onlyAuthorized onlyOneBlock
+//    {
+//        to.transfer(amount);
+//    }
+
     function transferToken(IERC20 _token, address to, uint256 amount) external onlyAuthorized onlyOneBlock {
         //Required in order move MASTER and other tokens if they get stuck in the contract.
         //Some security measures in place for MASTER and THEORY.
         require(address(_token) != address(this) || amount <= balanceOf(address(this)).sub(totalWithdrawRequestedInMaster), "Cannot transfer more than accidental funds.");
         //require(address(_token) != address(theory) || amount <= theory.balanceOf(address(this)).sub(totalStakeRequested.add(totalWithdrawUnclaimed)), "Cannot withdraw pending funds."); //To prevent a number of issues that crop up when extra THEORY is removed, this function as been disabled. THEORY sent here is essentially donated to MASTER if staked. Otherwise, it is out of circulation.
         require(address(_token) != address(theory), "Cannot bring down price of MASTER.");
+        require(address(_token) != address(game) || amount <= game.balanceOf(address(this)).sub(totalGameUnclaimed), "Cannot transfer more than accidental funds.");
+        //WHITELIST BEGIN
+        require(address(_token) == address(this) //MASTER
+            || address(_token) == address(game) //GAME
+            || address(_token) == address(0xFfF54fcdFc0E4357be9577D8BC2B4579ce9D5C88) //HODL
+            || address(_token) == address(0x8D11eC38a3EB5E956B052f67Da8Bdc9bef8Abf3E) //DAI
+            || address(_token) == address(0x168e509FE5aae456cDcAC39bEb6Fd56B6cb8912e) //GAME-DAI LP
+            || address(_token) == address(0xF69FCB51A13D4Ca8A58d5a8D964e7ae5d9Ca8594) //THEORY-DAI LP
+            || address(_token) == address(0x04068DA6C83AFCFA0e13ba15A6696662335D5B75) //USDC
+            || address(_token) == address(0x82f0B8B456c1A451378467398982d4834b6829c1) //MIM
+            || address(_token) == address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83) //WFTM
+            || address(_token) == address(0x74b23882a30290451A17c44f4F05243b6b58C76d) //ETH
+        , "Can only transfer whitelisted tokens.");
+        //WHITELIST END
         _token.safeTransfer(to, amount);
     }
 
@@ -251,6 +272,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         uint256 reward = userInfo[msg.sender].rewardEarned;
         if (reward > 0) {
             userInfo[msg.sender].rewardEarned = 0;
+            totalGameUnclaimed = totalGameUnclaimed.sub(reward);
             game.safeTransfer(msg.sender, reward);
             // GAME can always be locked.
             uint256 lockAmount = 0;
@@ -348,6 +370,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         }
         uint256 newBalance = game.totalBalanceOf(address(this));
         uint256 amount = newBalance.sub(initialBalance);
+        totalGameUnclaimed = totalGameUnclaimed.add(amount);
 
         //Calculate amount to earn
         // Create & add new snapshot
@@ -358,7 +381,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 
         if(supply == 0)
         {
-            game.transfer(treasury.daoFund(), amount);
+            game.safeTransfer(treasury.daoFund(), amount);
         }
 
         MasterSnapshot memory newSnapshot = MasterSnapshot({

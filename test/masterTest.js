@@ -199,6 +199,20 @@ describe('nftTests', function () {
         it("setTimes penalty too high FAILURE", async () => {
             await expect(gToken.setTimes(days.mul(366), days.mul(367))).to.be.revertedWith('Penalty too high.');
         });
+        //Not required as no payable function.
+        // it("transferFTM SUCCESS", async () => {
+        //     await deployer.sendTransaction({
+        //         to: gToken.address,
+        //         value: one
+        //     });
+        //     expect(await ethers.provider.getBalance(gToken.address)).to.equal(one);
+        //     await gToken.transferFTM(deployer.address, one);
+        //     expect(await ethers.provider.getBalance(gToken.address)).to.equal(zero);
+        // });
+        // it("transferFTM not authorized FAILURE", async () => {
+        //     await gToken.renounceOwnership();
+        //     await expect(gToken.transferFTM(gToken.address, deployer.address, one)).to.be.revertedWith('caller is not authorized');
+        // });
         it("transferToken SUCCESS", async () => {
             let balances = {};
             balances[gToken.address] = oneBillion;
@@ -215,6 +229,10 @@ describe('nftTests', function () {
         //MASTER failure will be tested in another test.
         it("transferToken THEORY FAILURE", async () => {
             await expect(gToken.transferToken(sToken.address, deployer.address, one)).to.be.revertedWith('Cannot bring down price of MASTER.');
+        });
+        //GAME failure will be tested in another test.
+        it("transferToken whitelist FAILURE", async () => {
+            await expect(gToken.transferToken("0x049d68029688eAbF473097a2fC38ef61633A3C7A", deployer.address, one)).to.be.revertedWith('Can only transfer whitelisted tokens.');
         });
         it("stakeExternalTheory SUCCESS", async () => {
             await sToken.transfer(gToken.address, one);
@@ -703,7 +721,19 @@ describe('nftTests', function () {
             await expect(tokenOwed).to.equal(await theoretics.earned(deployer.address));
             await expect(await gToken.earned(deployer.address)).to.not.equal(zero);
 
+            await expect(gToken.transferToken(pToken.address, deployer.address, tokenOwed)).to.be.revertedWith("Cannot transfer more than accidental funds.");
+            await expect(gToken.transferToken(pToken.address, deployer.address, one.add(tokenOwed))).to.be.revertedWith("Cannot transfer more than accidental funds.");
+            await expect(gToken.transferToken(pToken.address, deployer.address, one)).to.be.revertedWith("Cannot transfer more than accidental funds.");
+            await pToken.transfer(gToken.address, one);
+            await expect(gToken.transferToken(pToken.address, deployer.address, one.add(tokenOwed))).to.be.revertedWith("Cannot transfer more than accidental funds.");
+            await gToken.transferToken(pToken.address, deployer.address, one);
+            await expect(await gToken.totalGameUnclaimed()).to.equal(tokenOwed);
+
+            //Whoops, forgot to add this in at the end, and Master doesn't like it. Oh well, we can calculate it ourselves.
+            //await expect(await gToken.expectedClaimableGameThisEpoch()).to.equal(tokenOwed);
+
             await gToken.claimGame();
+            await expect(await gToken.totalGameUnclaimed()).to.equal(zero);
             expect(await pToken.totalBalanceOf(deployer.address)).to.equal(tokenOwed.add(one));
             expect(await pToken.lockOf(deployer.address)).to.equal(tokenOwed.mul(95).div(100));
             expect(await pToken.balanceOf(deployer.address)).to.equal(tokenOwed.add(one).sub(tokenOwed.mul(95).div(100)));
