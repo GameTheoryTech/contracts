@@ -1,4 +1,3 @@
-//Whoops, next time, remove withdrawEpochs == 0 from "Already called" and "Must be called at most 30 minutes before epoch ends." so that Gelato can call it every epoch instead of eating all the gas.
 const { ethers } = require('hardhat');
 const { expect, assert, should, eventually } = require('chai');
 const { smockit } = require('@defi-wonderland/smock');
@@ -23,13 +22,8 @@ async function latestBlockNumber(provider) {
     const { number } = await provider.getBlock('latest');
     return number;
 }
-//TODO: Check lock
-//TODO: Check lock decay
-//TODO: Check multiplier
-//TODO: Make sure no lock after pools are over
-//TODO: Test slashing fees
-//TODO: Test all new set functions (lock, fees, multiplier, etc.)
-describe('nftTests', function () {
+
+describe('masterTests', function () {
     var pToken;
     var bToken;
     var sToken;
@@ -167,7 +161,15 @@ describe('nftTests', function () {
         gToken = await Master.deploy(sToken.address,
             pToken.address,
             theoretics.address,
-            treasuryDAO.address);
+            treasuryDAO.address,
+            ["0xFfF54fcdFc0E4357be9577D8BC2B4579ce9D5C88",
+            "0x8D11eC38a3EB5E956B052f67Da8Bdc9bef8Abf3E" ,
+            "0x168e509FE5aae456cDcAC39bEb6Fd56B6cb8912e" ,
+            "0xF69FCB51A13D4Ca8A58d5a8D964e7ae5d9Ca8594" ,
+            "0x04068DA6C83AFCFA0e13ba15A6696662335D5B75" ,
+            "0x82f0B8B456c1A451378467398982d4834b6829c1" ,
+            "0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83" ,
+            "0x74b23882a30290451A17c44f4F05243b6b58C76d"]);
         await gToken.deployed();
         const gTokenDecimals = await gToken.decimals();
         console.log("- MasterToken deployed to:", gToken.address);
@@ -182,23 +184,23 @@ describe('nftTests', function () {
     });
 
     describe('Master', () => {
-        it("setTimes SUCCESS", async () => {
-            await gToken.setTimes(days.mul(366), days.mul(31));
+        it("setAdmin SUCCESS", async () => {
+            await gToken.setAdmin(days.mul(366), days.mul(31), false);
             expect(await gToken.minLockTime()).to.equal(days.mul(366));
             expect(await gToken.unlockedClaimPenalty()).to.equal(days.mul(31));
-            await gToken.setTimes(days.mul(730), days.mul(730));
+            await gToken.setAdmin(days.mul(730), days.mul(730), true);
             expect(await gToken.minLockTime()).to.equal(days.mul(730));
             expect(await gToken.unlockedClaimPenalty()).to.equal(days.mul(730));
         });
-        it("setTimes not authorized FAILURE", async () => {
+        it("setAdmin not authorized FAILURE", async () => {
             await gToken.renounceOwnership();
-            await expect(gToken.setTimes(days.mul(366), days.mul(31))).to.be.revertedWith('caller is not authorized');
+            await expect(gToken.setAdmin(days.mul(366), days.mul(31), false)).to.be.revertedWith('caller is not authorized');
         });
-        it("setTimes lockTime too high FAILURE", async () => {
-            await expect(gToken.setTimes(days.mul(731), days.mul(31))).to.be.revertedWith('Lock time too high.');
+        it("setAdmin lockTime too high FAILURE", async () => {
+            await expect(gToken.setAdmin(days.mul(731), days.mul(31), false)).to.be.revertedWith('LT');
         });
-        it("setTimes penalty too high FAILURE", async () => {
-            await expect(gToken.setTimes(days.mul(366), days.mul(367))).to.be.revertedWith('Penalty too high.');
+        it("setAdmin penalty too high FAILURE", async () => {
+            await expect(gToken.setAdmin(days.mul(366), days.mul(367), false)).to.be.revertedWith('PT');
         });
         //Not required as no payable function.
         // it("transferFTM SUCCESS", async () => {
@@ -229,11 +231,11 @@ describe('nftTests', function () {
         });
         //MASTER failure will be tested in another test.
         it("transferToken THEORY FAILURE", async () => {
-            await expect(gToken.transferToken(sToken.address, deployer.address, one)).to.be.revertedWith('Cannot bring down price of MASTER.');
+            await expect(gToken.transferToken(sToken.address, deployer.address, one)).to.be.revertedWith('MP-');
         });
         //GAME failure will be tested in another test.
         it("transferToken whitelist FAILURE", async () => {
-            await expect(gToken.transferToken("0x049d68029688eAbF473097a2fC38ef61633A3C7A", deployer.address, one)).to.be.revertedWith('Can only transfer whitelisted tokens.');
+            await expect(gToken.transferToken("0x049d68029688eAbF473097a2fC38ef61633A3C7A", deployer.address, one)).to.be.revertedWith('WL');
         });
         it("stakeExternalTheory SUCCESS", async () => {
             await sToken.transfer(gToken.address, one);
@@ -259,7 +261,7 @@ describe('nftTests', function () {
             balances[deployer.address] = oneBillion;
             await sToken.setVariable("_balances", balances);
             await sToken.setVariable("_totalSupply", oneBillion);
-            await gToken.setTimes(days, hours);
+            await gToken.setAdmin(days, hours, false);
             await expect(gToken.claimGame()).to.be.revertedWith("No GAME to claim.");
 
             await sToken.approve(gToken.address, one);
@@ -394,7 +396,7 @@ describe('nftTests', function () {
             expect(await sToken.balanceOf(gToken.address)).to.equal(one);
 
             //stakeExternalTheory FAILURE
-            await expect(gToken.stakeExternalTheory(one)).to.be.revertedWith("Cannot stake pending funds.");
+            await expect(gToken.stakeExternalTheory(one)).to.be.revertedWith("PF");
 
             //Sell request
             await expect(gToken.requestSellToTheory(one, false)).to.be.revertedWith("Still locked!");
@@ -404,12 +406,12 @@ describe('nftTests', function () {
             await expect(gToken.sellToTheory()).to.be.revertedWith("No zero amount allowed.");
             await expect(gToken.requestSellToTheory(one, false)).to.be.revertedWith("Cannot withdraw with a stake pending.");
 
-            await expect(gToken.initiatePart1(false)).to.be.revertedWith("Must call at a withdraw epoch.");
-            await expect(gToken.initiatePart2()).to.be.revertedWith("Must call at a withdraw epoch.");
+            await expect(gToken.initiatePart1(false)).to.be.revertedWith("WE");
+            await expect(gToken.initiatePart2()).to.be.revertedWith("WE");
 
             while(!((await theoretics.epoch()).eq(6))) await treasuryDAO.allocateSeigniorage();
 
-            await expect(gToken.initiatePart2()).to.be.revertedWith("Initiate part 1 first.");
+            await expect(gToken.initiatePart2()).to.be.revertedWith("IP1");
             await gToken.initiatePart1(false);
             expect(await sToken.balanceOf(deployer.address)).to.equal(oneBillion.sub(half).sub(one));
             expect(await gToken.balanceOf(deployer.address)).to.equal(one);
@@ -453,10 +455,10 @@ describe('nftTests', function () {
             expect(user.lastStakeRequestBlock).to.not.equal(0);
             expect(user.lastWithdrawRequestBlock).to.not.equal(0);
 
-            await expect(gToken.initiatePart1(false)).to.be.revertedWith("Already called.");
-            await expect(gToken.initiatePart2()).to.be.revertedWith("Already called.");
+            await expect(gToken.initiatePart1(false)).to.be.revertedWith("AC");
+            await expect(gToken.initiatePart2()).to.be.revertedWith("AC");
 
-            await expect(gToken.transferToken(gToken.address, deployer.address, one)).to.be.revertedWith("Cannot transfer more than accidental funds.");
+            await expect(gToken.transferToken(gToken.address, deployer.address, one)).to.be.revertedWith("AF");
 
             while(!((await theoretics.epoch()).eq(12))) await treasuryDAO.allocateSeigniorage();
 
@@ -641,8 +643,8 @@ describe('nftTests', function () {
             await expect(await gToken.earned(deployer.address)).to.not.equal(zero);
 
             await gToken.claimGame();
-            expect(await pToken.totalBalanceOf(deployer.address)).to.equal(tokenOwed.add(one));
-            expect(await pToken.lockOf(deployer.address)).to.equal(tokenOwed.mul(95).div(100));
+            expect(await gToken.totalBalanceOfGame(deployer.address)).to.equal(tokenOwed.add(one));
+            expect(await gToken.lockOfGame(deployer.address)).to.equal(tokenOwed.mul(95).div(100));
             expect(await pToken.balanceOf(deployer.address)).to.equal(tokenOwed.add(one).sub(tokenOwed.mul(95).div(100)));
             expect(await gToken.earned(deployer.address)).to.equal(zero);
         });
@@ -673,8 +675,8 @@ describe('nftTests', function () {
                 await treasuryDAO.allocateSeigniorage();
             }
 
-            await expect(gToken.initiatePart1(false)).to.be.revertedWith("Must be called at most 30 minutes before epoch ends.");
-            await expect(gToken.initiatePart2()).to.be.revertedWith("Must be called at most 30 minutes before epoch ends.");
+            await expect(gToken.initiatePart1(false)).to.be.revertedWith("30");
+            await expect(gToken.initiatePart2()).to.be.revertedWith("30");
 
             await advanceTime(ethers.provider, hours.mul(5).add(minutes.mul(30)).toNumber());
 
@@ -722,11 +724,11 @@ describe('nftTests', function () {
             await expect(tokenOwed).to.equal(await theoretics.earned(deployer.address));
             await expect(await gToken.earned(deployer.address)).to.not.equal(zero);
 
-            await expect(gToken.transferToken(pToken.address, deployer.address, tokenOwed)).to.be.revertedWith("Cannot transfer more than accidental funds.");
-            await expect(gToken.transferToken(pToken.address, deployer.address, one.add(tokenOwed))).to.be.revertedWith("Cannot transfer more than accidental funds.");
-            await expect(gToken.transferToken(pToken.address, deployer.address, one)).to.be.revertedWith("Cannot transfer more than accidental funds.");
+            await expect(gToken.transferToken(pToken.address, deployer.address, tokenOwed)).to.be.revertedWith("AF");
+            await expect(gToken.transferToken(pToken.address, deployer.address, one.add(tokenOwed))).to.be.revertedWith("AF");
+            await expect(gToken.transferToken(pToken.address, deployer.address, one)).to.be.revertedWith("AF");
             await pToken.transfer(gToken.address, one);
-            await expect(gToken.transferToken(pToken.address, deployer.address, one.add(tokenOwed))).to.be.revertedWith("Cannot transfer more than accidental funds.");
+            await expect(gToken.transferToken(pToken.address, deployer.address, one.add(tokenOwed))).to.be.revertedWith("AF");
             await gToken.transferToken(pToken.address, deployer.address, one);
             await expect(await gToken.totalGameUnclaimed()).to.equal(tokenOwed);
 
@@ -735,13 +737,29 @@ describe('nftTests', function () {
 
             await gToken.claimGame();
             await expect(await gToken.totalGameUnclaimed()).to.equal(zero);
-            expect(await pToken.totalBalanceOf(deployer.address)).to.equal(tokenOwed.add(one));
-            expect(await pToken.lockOf(deployer.address)).to.equal(tokenOwed.mul(95).div(100));
+            expect(await gToken.totalBalanceOfGame(deployer.address)).to.equal(tokenOwed.add(one));
+            expect(await gToken.lockOfGame(deployer.address)).to.equal(tokenOwed.mul(95).div(100));
             expect(await pToken.balanceOf(deployer.address)).to.equal(tokenOwed.add(one).sub(tokenOwed.mul(95).div(100)));
             expect(await gToken.earned(deployer.address)).to.equal(zero);
 
             await expect(gToken.connect(devfund).claimGame()).to.be.revertedWith("No GAME to claim.");
 
+            //Test all new GAME lock functions
+            user = await gToken.userInfo(deployer.address);
+            let gameToUnlock = await gToken.canUnlockAmountGame(deployer.address);
+            expect(gameToUnlock).to.equal(await gToken.totalCanUnlockAmountGame(deployer.address));
+            //expect(user.gameLocked).to.equal(await gToken.lockedSupplyGame());
+            expect(user.gameLocked).to.equal(await gToken.totalLockGame());
+            let balanceBefore = await pToken.balanceOf(deployer.address);
+            let canUnlock = await gToken.totalCanUnlockAmountGame(deployer.address);
+            await gToken.unlockGame();
+            expect((await pToken.balanceOf(deployer.address)).gte(balanceBefore.add(canUnlock))).to.equal(true);
+            balanceBefore = await pToken.balanceOf(deployer.address);
+            let lockOf = await gToken.lockOfGame(deployer.address);
+            await gToken.unlockGameForUser(deployer.address, lockOf)
+            expect(await pToken.balanceOf(deployer.address)).to.equal(balanceBefore.add(lockOf))
+            await gToken.renounceOwnership();
+            await expect(gToken.unlockGameForUser(deployer.address, lockOf)).to.be.revertedWith('caller is not authorized');
         });
     });
 });

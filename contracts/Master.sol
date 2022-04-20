@@ -27,13 +27,16 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         uint256 withdrawRequestedInTheory;
         uint256 lastStakeRequestBlock;
         uint256 lastWithdrawRequestBlock;
+        uint256 gameLocked;
+        uint256 gameLockFrom;
+        uint256 gameLastUnlockTime;
     }
 
     mapping(address => UserInfo) public userInfo;
-    IERC20Lockable public theory;
-    IERC20Lockable public game;
-    ITheoretics public theoretics;
-    ITreasury public treasury;
+    IERC20Lockable private theory;
+    IERC20Lockable private game;
+    ITheoretics private theoretics;
+    ITreasury private treasury;
     uint256 public minLockTime;
     uint256 public unlockedClaimPenalty;
 
@@ -46,28 +49,34 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     uint256 public totalWithdrawRequestedInMaster;
     uint256 public totalWithdrawUnclaimedInTheory;
     uint256 public totalGameUnclaimed;
-    uint256 public lastInitiatePart1Epoch;
-    uint256 public lastInitiatePart2Epoch;
-    uint256 public lastInitiatePart1Block;
-    uint256 public lastInitiatePart2Block;
+    uint256 private lastInitiatePart1Epoch;
+    uint256 private lastInitiatePart2Epoch;
+    uint256 private lastInitiatePart1Block;
+    uint256 private lastInitiatePart2Block;
+    uint256 public totalGameLocked;
     struct MasterSnapshot {
         uint256 time;
         uint256 rewardReceived;
         uint256 rewardPerShare;
     }
     MasterSnapshot[] public masterHistory;
+    address[] private whitelistedTokens;
+    bool private emergencyUnlock;
 
 
     event RewardPaid(address indexed user, uint256 reward, uint256 lockAmount);
     event Deposit(address indexed user, uint256 amountInTheory, uint256 amountOutMaster);
     event Withdraw(address indexed user, uint256 amountInMaster, uint256 amountOutTheory);
     event WithdrawRequest(address indexed user, uint256 amountInMaster, uint256 amountOutTheory);
+    event LockGame(address indexed to, uint256 value);
+    event UnlockGame(address indexed to, uint256 value);
 
     //Permissions needed: game (Game)
     constructor(IERC20Lockable _theory,
                 IERC20Lockable _game,
                 ITheoretics _theoretics,
-                ITreasury _treasury) public ERC20("Master Token", "MASTER") {
+                ITreasury _treasury,
+                address[] memory _whitelist) public ERC20("Master Token", "MASTER") {
         theory = _theory;
         game = _game;
         theoretics = _theoretics;
@@ -76,6 +85,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         unlockedClaimPenalty = 30 days;
         MasterSnapshot memory genesisSnapshot = MasterSnapshot({time : block.number, rewardReceived : 0, rewardPerShare : 0});
         masterHistory.push(genesisSnapshot);
+        whitelistedTokens = _whitelist;
     }
 
 
@@ -112,30 +122,6 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         return what;
     }
 
-    //For THEORY -> MASTER (forked from https://github.com/DefiKingdoms/contracts/blob/main/contracts/Bank.sol)
-    function theoryToMasterOwed(uint256 _amount, uint256 totalGovernanceToken, uint256 totalShares) public view returns (uint256)
-    {
-        // If no xGovernanceToken exists, it is 1:1
-        if (totalShares == 0 || totalGovernanceToken == 0) {
-            return _amount;
-        }
-        // Calculates the amount of xGovernanceToken the GovernanceToken is worth. The ratio will change overtime, as xGovernanceToken is burned/minted and GovernanceToken deposited + gained from fees / withdrawn.
-        uint256 what = _amount.mul(totalShares).div(totalGovernanceToken);
-        return what;
-    }
-
-    //For MASTER -> THEORY (forked from https://github.com/DefiKingdoms/contracts/blob/main/contracts/Bank.sol)
-    function masterToTheoryOwed(uint256 _share, uint256 totalGovernanceToken, uint256 totalShares) public view returns (uint256)
-    {
-        // If no xGovernanceToken exists, it is 1:1
-        if (totalShares == 0 || totalGovernanceToken == 0) {
-            return _share;
-        }
-        // Calculates the amount of GovernanceToken the xGovernanceToken is worth
-        uint256 what = _share.mul(totalGovernanceToken).div(totalShares);
-        return what;
-    }
-
     //Snapshot
 
     // =========== Snapshot getters
@@ -163,11 +149,34 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         return balanceOf(theorist).mul(latestRPS.sub(storedRPS)).div(1e18).add(userInfo[theorist].rewardEarned);
     }
 
-    function expectedClaimableGameThisEpoch() public view returns (uint256) {
-        (, , uint256 latestRPS) = theoretics.getLatestSnapshot();
-        (, , uint256 storedRPS) = theoretics.theoreticsHistory(theoretics.latestSnapshotIndex().sub(1));
+    function canUnlockAmountGame(address _holder) public view returns (uint256) {
+        uint256 lockTime = game.lockTime();
+        UserInfo memory user = userInfo[_holder];
+        if (block.timestamp <= user.gameLockFrom) {
+            return 0;
+        } else if (block.timestamp >= user.gameLockFrom.add(lockTime)) {
+            return user.gameLocked;
+        } else {
+            uint256 releaseTime = block.timestamp.sub(user.gameLastUnlockTime);
+            uint256 numberLockTime = user.gameLockFrom.add(lockTime).sub(user.gameLastUnlockTime);
+            return user.gameLocked.mul(releaseTime).div(numberLockTime);
+        }
+    }
 
-        return theoretics.balanceOf(address(this)).mul(latestRPS.sub(storedRPS)).div(1e18);
+    function totalCanUnlockAmountGame(address _holder) external view returns (uint256) {
+       return game.canUnlockAmount(_holder).add(canUnlockAmountGame(_holder));
+    }
+
+    function totalBalanceOfGame(address _holder) external view returns (uint256) {
+        return userInfo[_holder].gameLocked.add(game.totalBalanceOf(_holder));
+    }
+
+    function lockOfGame(address _holder) external view returns (uint256) {
+        return game.lockOf(_holder).add(userInfo[_holder].gameLocked);
+    }
+
+    function totalLockGame() external view returns (uint256) {
+        return totalGameLocked.add(game.totalLock());
     }
 
     //Modifiers
@@ -182,13 +191,42 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     }
 
     //Admin functions
-    function setTimes(uint256 lockTime, uint256 penalty) external onlyAuthorized
+    function setAdmin(uint256 lockTime, uint256 penalty, bool emergency) external onlyAuthorized
     {
         //Default: 1 year/365 days
-        require(lockTime <= 730 days, "Lock time too high."); //730 days/2 years = length from beginning of emissions to full LTHEORY unlock.  No need to be higher than that.
-        require(penalty <= lockTime, "Penalty too high."); //No higher than lock time.
+        //Lock time too high.
+        require(lockTime <= 730 days, "LT"); //730 days/2 years = length from beginning of emissions to full LTHEORY unlock.  No need to be higher than that.
+        //Penalty too high.
+        require(penalty <= lockTime, "PT"); //No higher than lock time.
         minLockTime = lockTime;
         unlockedClaimPenalty = penalty;
+        emergencyUnlock = emergency;
+    }
+
+    function unlockGameForUser(address account, uint256 amount) public onlyAuthorized {
+        // First we need to unlock all tokens the address is eligible for.
+        uint256 pendingLocked = canUnlockAmountGame(account);
+        if (pendingLocked > 0) {
+            _unlockGame(account, pendingLocked);
+        }
+
+        // Then unlock GAME in the Game contract
+        uint256 pendingLockOf = game.lockOf(account); //Lock before
+        if (pendingLockOf > game.canUnlockAmount(msg.sender))
+        {
+            game.unlockForUser(account, 0); //Unlock amount naturally first.
+            pendingLockOf = game.lockOf(account);
+        }
+        if(pendingLockOf > 0)
+        {
+            game.unlockForUser(account, amount);
+            uint256 amountUnlocked = pendingLockOf.sub(game.lockOf(account)); //Lock before - lock after
+            if(amount > amountUnlocked) amount = amount.sub(amountUnlocked); //Don't unlock the amount already unlocked
+            else amount = 0; // <= 0? = 0
+        }
+
+        // Now that that's done, we can unlock the extra amount passed in.
+        if(amount > 0 && userInfo[account].gameLocked > 0) _unlockGame(account, amount);
     }
 
     //Not required as no payable function.
@@ -197,31 +235,35 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 //        to.transfer(amount);
 //    }
 
-    function transferToken(IERC20 _token, address to, uint256 amount) external onlyAuthorized onlyOneBlock {
+    function transferToken(IERC20 _token, address to, uint256 amount) external onlyAuthorized {
         //Required in order move MASTER and other tokens if they get stuck in the contract.
         //Some security measures in place for MASTER and THEORY.
-        require(address(_token) != address(this) || amount <= balanceOf(address(this)).sub(totalWithdrawRequestedInMaster), "Cannot transfer more than accidental funds.");
+        require(address(_token) != address(this) || amount <= balanceOf(address(this)).sub(totalWithdrawRequestedInMaster), "AF"); //Cannot transfer more than accidental funds.
         //require(address(_token) != address(theory) || amount <= theory.balanceOf(address(this)).sub(totalStakeRequested.add(totalWithdrawUnclaimed)), "Cannot withdraw pending funds."); //To prevent a number of issues that crop up when extra THEORY is removed, this function as been disabled. THEORY sent here is essentially donated to MASTER if staked. Otherwise, it is out of circulation.
-        require(address(_token) != address(theory), "Cannot bring down price of MASTER.");
-        require(address(_token) != address(game) || amount <= game.balanceOf(address(this)).sub(totalGameUnclaimed), "Cannot transfer more than accidental funds.");
-        //WHITELIST BEGIN
+        require(address(_token) != address(theory), "MP-"); //Cannot bring down price of MASTER.
+        require(address(_token) != address(game) || amount <= game.balanceOf(address(this)).sub(totalGameUnclaimed).sub(totalGameLocked), "AF"); //Cannot transfer more than accidental funds.
+        //WHITELIST BEGIN (Initiated in constructor due to contract size limits)
+        bool isInList = false;
+        uint256 i;
+        uint256 len = whitelistedTokens.length;
+        for(i = 0; i < len; ++i)
+        {
+            if(address(_token) == whitelistedTokens[i])
+            {
+                isInList = true;
+                break;
+            }
+        }
         require(address(_token) == address(this) //MASTER
             || address(_token) == address(game) //GAME
-            || address(_token) == address(0xFfF54fcdFc0E4357be9577D8BC2B4579ce9D5C88) //HODL
-            || address(_token) == address(0x8D11eC38a3EB5E956B052f67Da8Bdc9bef8Abf3E) //DAI
-            || address(_token) == address(0x168e509FE5aae456cDcAC39bEb6Fd56B6cb8912e) //GAME-DAI LP
-            || address(_token) == address(0xF69FCB51A13D4Ca8A58d5a8D964e7ae5d9Ca8594) //THEORY-DAI LP
-            || address(_token) == address(0x04068DA6C83AFCFA0e13ba15A6696662335D5B75) //USDC
-            || address(_token) == address(0x82f0B8B456c1A451378467398982d4834b6829c1) //MIM
-            || address(_token) == address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83) //WFTM
-            || address(_token) == address(0x74b23882a30290451A17c44f4F05243b6b58C76d) //ETH
-        , "Can only transfer whitelisted tokens.");
+            || isInList, "WL"); //Can only transfer whitelisted tokens.
+
         //WHITELIST END
         _token.safeTransfer(to, amount);
     }
 
     function stakeExternalTheory(uint256 amount) external onlyAuthorized onlyOneBlock {
-        require(amount <= theory.balanceOf(address(this)).sub(totalStakeRequestedInTheory.add(totalWithdrawUnclaimedInTheory)), "Cannot stake pending funds.");
+        require(amount <= theory.balanceOf(address(this)).sub(totalStakeRequestedInTheory.add(totalWithdrawUnclaimedInTheory)), "PF"); //Cannot stake pending funds.
         if(lastInitiatePart2Epoch == theoretics.epoch() || theoretics.getCurrentWithdrawEpochs() == 0)
         {
             //extraTheoryAdded = extraTheoryAdded.add(amount); //Track extra theory that we will stake immediately.
@@ -245,54 +287,86 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 //    }
 
     //Internal functions
-    function _lock(address user, uint256 lockTo) internal
-    {
-        userInfo[user].lockToTime = lockTo;
-    }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal updateReward(from) updateReward(to) virtual override {
         super._beforeTokenTransfer(from, to, amount);
     }
 
     function _transfer(address from, address to, uint256 amount) internal virtual override {
-        if(!(authorized[msg.sender] || owner() == msg.sender || treasury.daoFund() == msg.sender || address(this) == msg.sender || authorized[to] || owner() == to || treasury.daoFund() == to || address(this) == to))
+        address daoFund = treasury.daoFund();
+        address own = owner();
+        UserInfo storage user = userInfo[to];
+        if(user.lockToTime == 0 || !(authorized[msg.sender] || own == msg.sender || daoFund == msg.sender || address(this) == msg.sender
+        || authorized[from] || own == from || daoFund == from || address(this) == from
+        || authorized[to] || own == to || daoFund == to || address(this) == to))
         {
-            UserInfo storage user = userInfo[to];
-            require(user.approveTransferFrom == from, "Receiver did not approve transfer.");
+            require(user.lockToTime == 0 || user.approveTransferFrom == from, "Receiver did not approve transfer.");
             user.approveTransferFrom = address(0);
             uint256 nextTime = block.timestamp.add(minLockTime);
-            if(nextTime > user.lockToTime) _lock(to, nextTime);
+            if(nextTime > user.lockToTime) user.lockToTime = nextTime;
         }
         super._transfer(from, to, amount);
 
     }
 
+    function lockGame(address _holder, uint256 _amount) internal
+    {
+        UserInfo storage user = userInfo[_holder];
+        uint256 amount = canUnlockAmountGame(_holder);
+
+        if(user.gameLocked > 0) _unlockGame(_holder, amount); //Before we lock more, make sure we unlock everything we can, even if noUnlockBeforeTransfer is set.
+
+        uint256 _lockFromTime = block.timestamp;
+        user.gameLockFrom = _lockFromTime;
+
+        user.gameLocked = user.gameLocked.add(_amount);
+        totalGameLocked = totalGameLocked.add(_amount);
+        if (user.gameLastUnlockTime < user.gameLockFrom) {
+            user.gameLastUnlockTime = user.gameLockFrom;
+        }
+        emit LockGame(_holder, _amount);
+    }
+
+    function _unlockGame(address holder, uint256 amount) internal {
+        UserInfo storage user = userInfo[holder];
+        require(user.gameLocked > 0, "ILT"); //Insufficient locked tokens
+
+        // Make sure they aren't trying to unlock more than they have locked.
+        if (amount > user.gameLocked) {
+            amount = user.gameLocked;
+        }
+
+        // If the amount is greater than the total balance, set it to max.
+        if (amount > totalGameLocked) {
+            amount = totalGameLocked;
+        }
+        game.safeTransfer(holder, amount);
+        user.gameLocked = user.gameLocked.sub(amount);
+        user.gameLastUnlockTime = block.timestamp;
+        totalGameLocked = totalGameLocked.sub(amount);
+
+        emit UnlockGame(holder, amount);
+    }
     function _claimGame() internal
     {
         uint256 reward = userInfo[msg.sender].rewardEarned;
         if (reward > 0) {
             userInfo[msg.sender].rewardEarned = 0;
             totalGameUnclaimed = totalGameUnclaimed.sub(reward);
-            game.safeTransfer(msg.sender, reward);
             // GAME can always be locked.
             uint256 lockAmount = 0;
             uint256 lockPercentage = theoretics.getLockPercentage();
-            require(lockPercentage <= 100, "Invalid lock percentage, check this contract.");
+            require(lockPercentage <= 100, "LP"); //Invalid lock percentage, check Theoretics contract.
             lockAmount = reward.mul(lockPercentage).div(100);
-            if(lockAmount > 0) game.lock(msg.sender, lockAmount);
+            //if(lockAmount > 0) game.lock(msg.sender, lockAmount); //Due to security measures, this won't work. We have to make separate LGAME.
+            lockGame(msg.sender, lockAmount);
+            game.safeTransfer(msg.sender, reward.sub(lockAmount));
             emit RewardPaid(msg.sender, reward, lockAmount);
         }
     }
 
     function _initiatePart1(bool allowEmergency) internal
     {
-        uint256 withdrawEpochs = theoretics.getCurrentWithdrawEpochs();
-        //Every getCurrentWithdrawEpochs() epochs
-        require(withdrawEpochs == 0 || theoretics.epoch().mod(withdrawEpochs) == 0, "Must call at a withdraw epoch.");
-        //Only in last 30 minutes of the epoch.
-        require(withdrawEpochs == 0 || block.timestamp > theoretics.nextEpochPoint() || theoretics.nextEpochPoint().sub(block.timestamp) <= 30 minutes, "Must be called at most 30 minutes before epoch ends.");
-        //No calling twice within the epoch.
-        require(withdrawEpochs == 0 || lastInitiatePart1Epoch != theoretics.epoch(), "Already called.");
         //Unlock all LGAME, transfer GAME, then relock at normal rate.
         uint256 initialBalance = game.totalBalanceOf(address(this));
         //uint256 _withdrawLockupEpochs = theoretics.withdrawLockupEpochs();
@@ -348,7 +422,8 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
                 uint256 whatAfterWithdrawFee = newBalanceTheory.sub(initialBalanceTheory);
 
                 uint256 withdrawFee = what.sub(whatAfterWithdrawFee);
-                if(!allowEmergency || withdrawFee > 0 && theory.allowance(treasury.daoFund(), address(this)) >= withdrawFee) theory.safeTransferFrom(treasury.daoFund(), address(this), withdrawFee); //Send withdraw fee back to us. Don't allow this function to hold up funds.
+                address daoFund = treasury.daoFund();
+                if(!allowEmergency || withdrawFee > 0 && theory.allowance(daoFund, address(this)) >= withdrawFee) theory.safeTransferFrom(daoFund, address(this), withdrawFee); //Send withdraw fee back to us. Don't allow this function to hold up funds.
 
     //            if(extraTheoryWithdrawRequested > 0)
     //            {
@@ -419,7 +494,8 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     {
         require(amountInTheory > 0, "No zero amount allowed.");
         UserInfo storage user = userInfo[msg.sender];
-        require(user.withdrawRequestedInMaster == 0 && (theoretics.getCurrentWithdrawEpochs() == 0 || user.lastWithdrawRequestBlock == 0 || lastInitiatePart1Block > user.lastWithdrawRequestBlock), "Cannot stake with a withdraw pending.");
+        uint256 withdrawEpochs = theoretics.getCurrentWithdrawEpochs();
+        require(user.withdrawRequestedInMaster == 0 && (withdrawEpochs == 0 || user.lastWithdrawRequestBlock == 0 || lastInitiatePart1Block > user.lastWithdrawRequestBlock), "Cannot stake with a withdraw pending.");
 
         //Lock
         if(lockTime < minLockTime) lockTime = minLockTime;
@@ -427,17 +503,18 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
         uint256 nextTime = block.timestamp.add(lockTime);
 
         user.chosenLockTime = lockTime;
-        if(nextTime > user.lockToTime) _lock(msg.sender, nextTime);
+        if(nextTime > user.lockToTime) user.lockToTime = nextTime;
 
         //Mint
         uint256 what = theoryToMaster(amountInTheory);
         theory.safeTransferFrom(msg.sender, address(this), amountInTheory);
 
         _mint(msg.sender, what); //Don't delay mint, since price has to stay the same or higher (or else withdraws could be borked). Delayed buys could make it go lower.
-        if(lastInitiatePart2Epoch == theoretics.epoch() || theoretics.getCurrentWithdrawEpochs() == 0)
+        if(lastInitiatePart2Epoch == theoretics.epoch() || withdrawEpochs == 0)
         {
-            theory.safeApprove(address(theoretics), 0);
-            theory.safeApprove(address(theoretics), amountInTheory);
+            address theoreticsAddress = address(theoretics);
+            theory.safeApprove(theoreticsAddress, 0);
+            theory.safeApprove(theoreticsAddress, amountInTheory);
             theoretics.stake(amountInTheory); //Stake if we already have staked this epoch or are at 0 withdraw epochs.
         }
         else
@@ -452,9 +529,10 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
     function requestSellToTheory(uint256 amountInMaster, bool allowEmergency) public onlyOneBlock updateReward(msg.sender)
     {
         UserInfo storage user = userInfo[msg.sender];
-        require(block.timestamp >= user.lockToTime, "Still locked!");
+        require(block.timestamp >= user.lockToTime || emergencyUnlock, "Still locked!");
         require(amountInMaster > 0, "No zero amount allowed.");
-        require(theoretics.getCurrentWithdrawEpochs() == 0 || user.lastStakeRequestBlock == 0 || lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
+        uint256 withdrawEpochs = theoretics.getCurrentWithdrawEpochs();
+        require(withdrawEpochs == 0 || user.lastStakeRequestBlock == 0 || lastInitiatePart2Block > user.lastStakeRequestBlock, "Cannot withdraw with a stake pending.");
 
         if(amountInMaster == balanceOf(msg.sender)) _claimGame(); //Final GAME claim before moving to THEORY.
 
@@ -473,7 +551,7 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 
         user.lastWithdrawRequestBlock = block.number;
         emit WithdrawRequest(msg.sender, amountInMaster, what);
-        if(theoretics.getCurrentWithdrawEpochs() == 0)
+        if(withdrawEpochs == 0)
         {
             _initiatePart1(allowEmergency);
             _sellToTheory();
@@ -500,35 +578,58 @@ contract Master is ERC20Snapshot, AuthorizableNoOperator, ContractGuard {
 
     function initiatePart1(bool allowEmergency) public onlyOneBlock
     {
+        uint256 withdrawEpochs = theoretics.getCurrentWithdrawEpochs();
+        uint256 nextEpochPoint = theoretics.nextEpochPoint();
+        uint256 epoch = theoretics.epoch();
+        //Every getCurrentWithdrawEpochs() epochs
+        require(withdrawEpochs == 0 || epoch.mod(withdrawEpochs) == 0, "WE"); // Must call at a withdraw epoch.
+        //Only in last 30 minutes of the epoch.
+        require(block.timestamp > nextEpochPoint || nextEpochPoint.sub(block.timestamp) <= 30 minutes, "30"); //Must be called at most 30 minutes before epoch ends.
+        //No calling twice within the epoch.
+        require(lastInitiatePart1Epoch != epoch, "AC"); //Already called.
        _initiatePart1(allowEmergency);
     }
 
     function initiatePart2() public onlyOneBlock
     {
         uint256 withdrawEpochs = theoretics.getCurrentWithdrawEpochs();
+        uint256 nextEpochPoint = theoretics.nextEpochPoint();
+        uint256 epoch = theoretics.epoch();
         //Every getCurrentWithdrawEpochs() epochs
-        require(withdrawEpochs == 0 || theoretics.epoch().mod(withdrawEpochs) == 0, "Must call at a withdraw epoch.");
+        require(withdrawEpochs == 0 || epoch.mod(withdrawEpochs) == 0, "WE"); //Must call at a withdraw epoch.
         //Only in last 30 minutes of the epoch.
-        require(withdrawEpochs == 0 || block.timestamp > theoretics.nextEpochPoint() || theoretics.nextEpochPoint().sub(block.timestamp) <= 30 minutes, "Must be called at most 30 minutes before epoch ends.");
+        require(block.timestamp > nextEpochPoint || nextEpochPoint.sub(block.timestamp) <= 30 minutes, "30"); //Must be called at most 30 minutes before epoch ends.
         //No calling twice within the epoch.
-        require(withdrawEpochs == 0 || lastInitiatePart2Epoch != theoretics.epoch(), "Already called.");
+        require(lastInitiatePart2Epoch != epoch, "AC"); //Already called.
         //No calling before part 1.
-        require(withdrawEpochs == 0 || lastInitiatePart1Epoch == theoretics.epoch(), "Initiate part 1 first.");
+        require(lastInitiatePart1Epoch == epoch, "IP1"); //Initiate part 1 first.
         if(totalStakeRequestedInTheory > 0)
         {
-            theory.safeApprove(address(theoretics), 0);
-            theory.safeApprove(address(theoretics), totalStakeRequestedInTheory);
+            address theoreticsAddress = address(theoretics);
+            theory.safeApprove(theoreticsAddress, 0);
+            theory.safeApprove(theoreticsAddress, totalStakeRequestedInTheory);
             theoretics.stake(totalStakeRequestedInTheory);
             //extraTheoryAdded = extraTheoryAdded.add(extraTheoryStakeRequested); //Track extra theory that we have staked.
             //extraTheoryStakeRequested = 0;
             totalStakeRequestedInTheory = 0;
         }
-        lastInitiatePart2Epoch = theoretics.epoch();
+        lastInitiatePart2Epoch = epoch;
         lastInitiatePart2Block = block.number;
     }
 
     function approveTransferFrom(address from) public
     {
         userInfo[msg.sender].approveTransferFrom = from;
+    }
+
+    function unlockGame() public {
+        uint256 amount = canUnlockAmountGame(msg.sender);
+        uint256 lockOf = game.lockOf(msg.sender);
+        uint256 gameAmount = game.canUnlockAmount(msg.sender);
+        UserInfo memory user = userInfo[msg.sender];
+        require(user.gameLocked > 0 || lockOf > gameAmount, "ILT"); //Insufficient locked tokens
+        if (user.gameLocked > 0) _unlockGame(msg.sender, amount);
+        //Unlock GAME in smart contract as well (only if it won't revert), otherwise still have to call unlock() first.
+        if (lockOf > gameAmount) game.unlockForUser(msg.sender, 0);
     }
 }

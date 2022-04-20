@@ -10,6 +10,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface IERC20Lockable is IERC20 {
     function lock(address _holder, uint256 _amount) external;
     function lockOf(address account) external view returns (uint256);
+    function totalLock() external view returns (uint256);
+    function lockTime() external view returns (uint256);
     function totalBalanceOf(address account) external view returns (uint256);
     function canUnlockAmount(address account) external view returns (uint256);
     function unlockForUser(address account, uint256 amount) external;

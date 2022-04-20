@@ -33,12 +33,20 @@ async function main() {
     const treasuryDAOAddress = "0x98F5cdda1489503e755Da30BEc5FCD341C949791";
 
     await hre.run("verify:verify", {
-        address: '0xfDCACa44e1248aac450b657249E509738a789d8e',
+        address: '0x83641AA58E362A4554e10AD1D120Bf410e15Ca90',
         constructorArguments: [
             sToken.address,
             pToken.address,
             theoreticsAddress,
-            treasuryDAOAddress
+            treasuryDAOAddress,
+            ["0xFfF54fcdFc0E4357be9577D8BC2B4579ce9D5C88",
+                "0x8D11eC38a3EB5E956B052f67Da8Bdc9bef8Abf3E" ,
+                "0x168e509FE5aae456cDcAC39bEb6Fd56B6cb8912e" ,
+                "0xF69FCB51A13D4Ca8A58d5a8D964e7ae5d9Ca8594" ,
+                "0x04068DA6C83AFCFA0e13ba15A6696662335D5B75" ,
+                "0x82f0B8B456c1A451378467398982d4834b6829c1" ,
+                "0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83" ,
+                "0x74b23882a30290451A17c44f4F05243b6b58C76d"]
         ],
     });
 }
