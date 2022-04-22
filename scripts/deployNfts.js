@@ -46,6 +46,7 @@ async function main() {
 
     const spookySwapRouter = await ethers.getContractAt("UniswapV2Router02", "0xF491e7B69E4244ad4002BC14e878a34207E38c29");
 
+    //Issue: Level up to max won't work because it doesn't check for max level.
     const TheoryUnlockerGen1 = await hre.ethers.getContractFactory("TheoryUnlockerGen1");
     const theoryUnlockerGen1 = await TheoryUnlockerGen1.deploy(iTokenAddress, [oneHundred.mul(5), oneHundred.mul(5)], [sToken.address, pTokenAddress], daofund.address, theoryUnlocker.address, spookySwapRouter.address,
         [zero, startTime.add(days.mul(15)), startTime.add(days.mul(15).mul(2)), startTime.add(days.mul(15).mul(3)), startTime.add(days.mul(15).mul(4)), startTime.add(days.mul(15).mul(5)), startTime.add(days.mul(15).mul(6)), startTime.add(days.mul(15).mul(7)), startTime.add(days.mul(15).mul(8)), startTime.add(days.mul(15).mul(9))],
