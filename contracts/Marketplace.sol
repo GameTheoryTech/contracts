@@ -21,9 +21,7 @@ contract Marketplace is AuthorizableNoOperator, ReentrancyGuard, ContractGuard {
     Counters.Counter private _tokensCanceled;
 
     address public communityFund;
-    // address public communityFund = 0x1c932aED5dE394e7D0eA8467A3Ee0989689a3B32;
     IERC20 public buyToken; // Token address for buying NFT
-    // IERC20 public buyToken = 0x4B4F3e62902E54Ec861c253Dc64706378C2310EE; // Token address for buying NFT
     bool public mutex = false; // secure flag
     uint256 private feeRate = 25; // market fee in percent 2.5%, this should be integer in declare
 
